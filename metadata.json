@@ -1,0 +1,5 @@
+{
+  "name": "Galaxy Project",
+  "description": "A comprehensive project management dashboard for tracking schedules vs. actuals across 40+ concurrent projects, featuring worker time approval workflows.",
+  "requestFramePermissions": []
+}

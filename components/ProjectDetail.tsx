@@ -1,0 +1,349 @@
+
+import React, { useState } from 'react';
+import { Project, ProjectStatus, WorkerLog, LogStatus } from '../types';
+import { Calendar, User, Zap, Clock, DollarSign, ArrowLeft, MoreHorizontal, Plus, FileText, CheckCircle2 } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
+
+// --- Worker Gantt Component (Reused logic) ---
+const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
+  if (logs.length === 0) return <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-lg border border-dashed">No active shifts for today.</div>;
+
+  let minTime = new Date();
+  minTime.setHours(8, 0, 0, 0);
+  let maxTime = new Date();
+  maxTime.setHours(18, 0, 0, 0);
+
+  logs.forEach(log => {
+    if (log.scheduledStart < minTime) minTime = new Date(log.scheduledStart);
+    if (log.scheduledEnd > maxTime) maxTime = new Date(log.scheduledEnd);
+    if (log.actualStart && log.actualStart < minTime) minTime = new Date(log.actualStart);
+    const endRef = log.actualEnd || new Date();
+    if (endRef > maxTime) maxTime = endRef;
+  });
+
+  minTime = new Date(minTime.getTime() - 30 * 60000);
+  maxTime = new Date(maxTime.getTime() + 30 * 60000);
+  const totalDuration = maxTime.getTime() - minTime.getTime();
+  const getPos = (date: Date) => Math.max(0, Math.min(100, ((date.getTime() - minTime.getTime()) / totalDuration) * 100));
+
+  const markers = [];
+  const curr = new Date(minTime);
+  curr.setMinutes(0, 0, 0);
+  if (curr < minTime) curr.setHours(curr.getHours() + 1);
+  while (curr < maxTime) {
+    markers.push(new Date(curr));
+    curr.setHours(curr.getHours() + 1);
+  }
+
+  const now = new Date();
+  const currentPos = getPos(now);
+
+  return (
+    <div className="mt-4 relative overflow-x-auto">
+      {/* Container with min-width to ensure scroll on mobile */}
+      <div className="min-w-[600px] pb-4">
+        <div className="relative h-6 w-full border-b border-gray-200 mb-4">
+            {markers.map((time, i) => (
+            <div key={i} className="absolute bottom-0 text-[10px] text-gray-400 transform -translate-x-1/2 border-l border-gray-200 h-full pl-1" style={{ left: `${getPos(time)}%` }}>
+                {time.getHours()}:00
+            </div>
+            ))}
+        </div>
+        <div className="space-y-6">
+            {logs.map((log) => {
+            const schedLeft = getPos(log.scheduledStart);
+            const schedWidth = getPos(log.scheduledEnd) - schedLeft;
+            const actualStart = log.actualStart || log.scheduledStart;
+            const actualEnd = log.actualEnd || now;
+            const isLive = !log.actualEnd;
+            const actualLeft = getPos(actualStart);
+            const actualWidth = Math.max(1, getPos(actualEnd) - actualLeft);
+            const barColor = isLive ? 'bg-green-500' : (log.status === LogStatus.APPROVED ? 'bg-blue-500' : 'bg-amber-400');
+
+            return (
+                <div key={log.id} className="group flex items-center gap-4">
+                <div className="w-32 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700">
+                                {log.workerName.charAt(0)}
+                            </div>
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-medium text-gray-900 truncate">{log.workerName}</p>
+                                <p className="text-[10px] text-gray-500 truncate">{log.role}</p>
+                            </div>
+                    </div>
+                </div>
+                <div className="flex-1 relative h-8 bg-gray-50 rounded border border-gray-100 overflow-hidden">
+                        {markers.map((time, i) => (<div key={i} className="absolute top-0 bottom-0 w-px bg-gray-200 opacity-30" style={{ left: `${getPos(time)}%` }}></div>))}
+                        <div className="absolute top-1.5 h-5 bg-indigo-100/50 border border-indigo-200 border-dashed rounded-sm" style={{ left: `${schedLeft}%`, width: `${schedWidth}%` }}></div>
+                        {log.actualStart && (
+                            <div className={`absolute top-2.5 h-3 rounded-full shadow-sm ${barColor} transition-all duration-500`} style={{ left: `${actualLeft}%`, width: `${actualWidth}%` }}>
+                                {isLive && <span className="absolute -right-1 top-0 bottom-0 w-2 bg-white/30 animate-pulse rounded-full"></span>}
+                            </div>
+                        )}
+                </div>
+                <div className="w-24 text-right flex-shrink-0">
+                    <div className={`text-xs font-bold ${isLive ? 'text-green-600' : 'text-gray-600'}`}>{isLive ? 'Active' : 'Done'}</div>
+                    <div className="text-[10px] text-gray-400">
+                        {log.actualStart ? formatTime(log.actualStart) : '--'} - {isLive ? '...' : (log.actualEnd ? formatTime(log.actualEnd) : '--')}
+                    </div>
+                </div>
+                </div>
+            );
+            })}
+        </div>
+        {logs.some(l => l.scheduledStart.getDate() === now.getDate()) && currentPos > 0 && currentPos < 100 && (
+            <div className="absolute top-8 bottom-4 w-px bg-red-400 z-10 pointer-events-none border-l border-dashed border-red-500" style={{ left: `${currentPos}%` }}>
+                <div className="absolute -top-1 -translate-x-1/2 text-[9px] bg-red-500 text-white px-1 rounded shadow-sm whitespace-nowrap">Now</div>
+            </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- Main Detail Component ---
+
+interface ProjectDetailProps {
+  project: Project;
+  logs: WorkerLog[];
+  onBack: () => void;
+  onAnalyze: (p: Project) => void;
+}
+
+export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onBack, onAnalyze }) => {
+  const [activeTab, setActiveTab] = useState<'LIVE' | 'FINANCE' | 'INFO'>('LIVE');
+
+  // Filter logs for Today (Live View)
+  const today = new Date();
+  const todaysLogs = logs.filter(l => 
+    l.scheduledStart.getDate() === today.getDate() && 
+    l.scheduledStart.getMonth() === today.getMonth() &&
+    l.scheduledStart.getFullYear() === today.getFullYear()
+  );
+
+  // Financial Data Mockup
+  const financeData = [
+      { name: 'Labor', budget: project.budget * 0.6, spent: project.spent * 0.65 },
+      { name: 'Materials', budget: project.budget * 0.3, spent: project.spent * 0.25 },
+      { name: 'Overhead', budget: project.budget * 0.1, spent: project.spent * 0.1 },
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+        {/* Top Navigation / Breadcrumb */}
+        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-center justify-between sticky top-0 z-20 shadow-sm gap-4 flex-shrink-0">
+            <div className="flex items-center gap-3 md:gap-4">
+                <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                    <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="min-w-0">
+                    <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2 truncate">
+                        <span className="truncate">{project.name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${project.status === ProjectStatus.ACTIVE ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                            {project.status}
+                        </span>
+                    </h1>
+                    <p className="text-xs md:text-sm text-gray-500 truncate">{project.client} • {project.id}</p>
+                </div>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+                 <button 
+                    onClick={() => onAnalyze(project)}
+                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-indigo-200 whitespace-nowrap"
+                >
+                    <Zap className="w-4 h-4" /> <span className="md:inline">AI Insight</span>
+                </button>
+                <button className="p-2 text-gray-400 hover:text-gray-600">
+                    <MoreHorizontal className="w-5 h-5" />
+                </button>
+            </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 max-w-7xl mx-auto w-full space-y-4 md:space-y-6">
+            
+            {/* High Level Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Total Budget</span>
+                    <div className="flex items-end justify-between mt-2">
+                        <span className="text-lg md:text-2xl font-bold text-gray-900">${project.budget.toLocaleString()}</span>
+                        <DollarSign className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
+                    </div>
+                </div>
+                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Actual Spent</span>
+                    <div className="flex items-end justify-between mt-2">
+                        <span className={`text-lg md:text-2xl font-bold ${(project.spent > project.budget) ? 'text-red-600' : 'text-gray-900'}`}>
+                            ${project.spent.toLocaleString()}
+                        </span>
+                        <span className={`text-[10px] md:text-xs font-medium px-1.5 py-0.5 rounded ${project.spent/project.budget > 0.9 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                            {((project.spent/project.budget)*100).toFixed(0)}%
+                        </span>
+                    </div>
+                </div>
+                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Deadline</span>
+                    <div className="flex items-end justify-between mt-2">
+                        <span className="text-sm md:text-lg font-bold text-gray-900">{project.scheduledEnd.toLocaleDateString()}</span>
+                        <Calendar className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
+                    </div>
+                </div>
+                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Team Size</span>
+                    <div className="flex items-end justify-between mt-2">
+                        <span className="text-lg md:text-2xl font-bold text-gray-900">{logs.length > 0 ? new Set(logs.map(l => l.workerName)).size : 0}</span>
+                        <User className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Tabs Container */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-h-[500px] flex flex-col">
+                <div className="border-b border-gray-200 px-4 md:px-6 flex items-center gap-6 overflow-x-auto">
+                    <button 
+                        onClick={() => setActiveTab('LIVE')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'LIVE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Live Operations
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('FINANCE')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'FINANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Financial Overview
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('INFO')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'INFO' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Project Details
+                    </button>
+                </div>
+
+                <div className="p-4 md:p-6 flex-1">
+                    {/* LIVE TAB */}
+                    {activeTab === 'LIVE' && (
+                        <div className="animate-in fade-in duration-300">
+                            <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-3">
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">Today's Schedule</h3>
+                                    <p className="text-sm text-gray-500">Real-time tracking of active workers.</p>
+                                </div>
+                                <button className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm w-full md:w-auto">
+                                    <Plus className="w-4 h-4" /> Assign Worker
+                                </button>
+                            </div>
+                            
+                            <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-4 md:p-6">
+                                <WorkerGanttChart logs={todaysLogs.length > 0 ? todaysLogs : logs.slice(0, 5)} />
+                            </div>
+
+                            <div className="mt-8">
+                                <h4 className="font-semibold text-gray-800 mb-4">Recent Alerts</h4>
+                                <div className="space-y-3">
+                                    {logs.filter(l => l.notes && l.notes.length > 10).slice(0, 3).map(log => (
+                                        <div key={log.id} className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                                            <div className="mt-0.5 flex-shrink-0">
+                                                <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">{log.workerName}: {log.notes}</p>
+                                                <p className="text-xs text-gray-500">{log.scheduledStart.toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {logs.every(l => !l.notes || l.notes.length <= 10) && (
+                                        <p className="text-sm text-gray-400 italic">No recent alerts or issues reported.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FINANCE TAB */}
+                    {activeTab === 'FINANCE' && (
+                        <div className="animate-in fade-in duration-300">
+                             <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-gray-900">Cost Breakdown</h3>
+                                <div className="text-sm text-gray-500">Last updated: Today</div>
+                            </div>
+                            
+                            <div className="h-80 w-full mb-8">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={financeData}
+                                        layout="vertical"
+                                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" />
+                                        <YAxis dataKey="name" type="category" width={80} />
+                                        <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                                        <Legend />
+                                        <Bar dataKey="budget" name="Budget Allocated" fill="#e0e7ff" radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="spent" name="Actual Spent" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {financeData.map((item, idx) => (
+                                    <div key={idx} className="p-4 rounded-lg border border-gray-200 bg-white">
+                                        <p className="text-sm font-medium text-gray-500 mb-1">{item.name}</p>
+                                        <div className="flex items-baseline justify-between">
+                                            <span className="text-xl font-bold text-gray-900">${item.spent.toLocaleString()}</span>
+                                            <span className={`text-xs font-medium ${item.spent > item.budget ? 'text-red-500' : 'text-green-500'}`}>
+                                                {((item.spent/item.budget)*100).toFixed(0)}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+                                            <div className={`h-1.5 rounded-full ${item.spent > item.budget ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (item.spent/item.budget)*100)}%`}}></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* INFO TAB */}
+                    {activeTab === 'INFO' && (
+                        <div className="animate-in fade-in duration-300 max-w-2xl">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Project Overview</h3>
+                            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</label>
+                                    <p className="text-gray-700 mt-2 leading-relaxed">{project.description}</p>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Start Date</label>
+                                        <p className="text-gray-900 mt-1 font-medium">{project.scheduledStart.toLocaleDateString()}</p>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Projected End</label>
+                                        <p className="text-gray-900 mt-1 font-medium">{project.scheduledEnd.toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
+                                    <div className="flex gap-2 mt-2 flex-wrap">
+                                        {project.tags.map(tag => (
+                                            <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    </div>
+  );
+};
