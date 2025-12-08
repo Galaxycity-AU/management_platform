@@ -1,7 +1,5 @@
-import { start } from 'repl';
-
-const { DataTypes } = require('sequelize');
-const sequelize = require('../database');
+import { DataTypes } from 'sequelize';
+import sequelize from '../database.js';
 
 const Job = sequelize.define('Job', {
     id: {
@@ -53,4 +51,5 @@ const Job = sequelize.define('Job', {
     timestamps: true,
     tableName: 'jobs'
 });
-module.exports = Job;
+
+export default Job;

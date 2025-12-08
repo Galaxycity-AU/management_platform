@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../database');
+import { DataTypes } from 'sequelize';
+import sequelize from '../database.js';
 
 const Approval = sequelize.define('Approval', {
     id: {
@@ -31,4 +31,5 @@ const Approval = sequelize.define('Approval', {
     timestamps: true,
     tableName: 'approvals'
 });
-module.exports = Approval;
+
+export default Approval;

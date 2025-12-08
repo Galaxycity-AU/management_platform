@@ -1,6 +1,6 @@
-const express = require("express");
-const cors = require("cors");
-const { sequelize, Project, Job, Worker, Approval } = require("../models/models");
+import express from 'express';
+import cors from 'cors';
+import { sequelize, Project, Job, Worker, Approval } from '../models/models/index.js';
 
 const app = express();
 app.use(cors());
