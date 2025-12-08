@@ -1,3 +1,4 @@
+
 import { Project, ProjectStatus, WorkerLog, LogStatus } from '../types';
 
 const CLIENTS = ['Acme Corp', 'Globex', 'Soylent Corp', 'Initech', 'Massive Dynamic', 'Stark Ind'];
@@ -103,27 +104,46 @@ export const generateMockData = (): { projects: Project[]; logs: WorkerLog[] } =
             // For demo purposes, mix it up
             if (j % 2 === 0) {
                  actualLogEnd = null; // Still working (Live)
-            } else {
-                 // Finished earlier today
-                 // Ensure end time is before "now" if we want it to look realistic, or just keep it random
             }
         }
 
         const isPending = !!actualLogEnd && Math.random() > 0.6;
+        const logStatus = isPending ? LogStatus.PENDING : LogStatus.APPROVED;
 
-        logs.push({
+        // Create the log object
+        const log: WorkerLog = {
           id: `log-${i}-${j}`,
           projectId: project.id,
           projectName: project.name,
-          workerName: NAMES[j % NAMES.length], // Ensure distinct names per project
+          workerName: NAMES[j % NAMES.length],
           role: getRandomElement(ROLES),
           scheduledStart: logStart,
           scheduledEnd: logEnd,
           actualStart: actualLogStart,
           actualEnd: actualLogEnd,
-          status: isPending ? LogStatus.PENDING : LogStatus.APPROVED,
+          // Initialize original times same as actuals initially
+          originalActualStart: actualLogStart,
+          originalActualEnd: actualLogEnd,
+          status: logStatus,
           notes: actualLogEnd ? (isPending ? "Please check my overtime." : "Standard shift.") : "Currently Active"
-        });
+        };
+
+        // If Approved, randomly simulate that it was Adjusted
+        if (logStatus === LogStatus.APPROVED && actualLogEnd) {
+            log.approvedBy = "Manager";
+            log.approvedAt = new Date(logEnd.getTime() + 3600000); // Approved 1 hour later
+            
+            // 20% chance it was adjusted
+            if (Math.random() > 0.8) {
+                // Simulate: User claimed 18:00, Manager adjusted to 17:30
+                const originalEnd = new Date(actualLogEnd);
+                originalEnd.setMinutes(originalEnd.getMinutes() + 30);
+                log.originalActualEnd = originalEnd;
+                log.adjustmentReason = "Capped overtime at 30 mins per policy.";
+            }
+        }
+
+        logs.push(log);
       }
     }
   }

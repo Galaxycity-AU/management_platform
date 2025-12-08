@@ -48,12 +48,26 @@ function App() {
   ];
 
   // Handlers
-  const handleApproveLog = (id: string) => {
-    setLogs(prev => prev.map(l => l.id === id ? { ...l, status: LogStatus.APPROVED } : l));
+  const handleApproveLog = (id: string, adjustedStart?: Date, adjustedEnd?: Date, reason?: string) => {
+    setLogs(prev => prev.map(l => {
+        if (l.id === id) {
+            return { 
+                ...l, 
+                status: LogStatus.APPROVED,
+                actualStart: adjustedStart || l.actualStart,
+                actualEnd: adjustedEnd || l.actualEnd,
+                // If adjusted, we keep the adjustment reason
+                adjustmentReason: reason,
+                approvedAt: new Date(),
+                approvedBy: 'Current User'
+            };
+        }
+        return l;
+    }));
   };
 
   const handleRejectLog = (id: string) => {
-    setLogs(prev => prev.map(l => l.id === id ? { ...l, status: LogStatus.REJECTED } : l));
+    setLogs(prev => prev.map(l => l.id === id ? { ...l, status: LogStatus.REJECTED, approvedAt: new Date() } : l));
   };
 
   const handleAnalyzeProject = async (project: Project) => {
@@ -88,7 +102,7 @@ function App() {
         <div className="p-6 border-b border-gray-100">
           <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
             <LayoutDashboard className="w-6 h-6" />
-            Galaxy Project
+            ProjectFlow
           </h1>
         </div>
         <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
@@ -147,7 +161,7 @@ function App() {
                      {/* Mobile/Tablet Logo/Title shown only on screens smaller than LG */}
                      <div className="lg:hidden flex items-center gap-2 text-indigo-600 font-bold">
                         <LayoutDashboard className="w-5 h-5" />
-                        <span>Galaxy Project</span>
+                        <span>ProjectFlow</span>
                      </div>
                      <h2 className="hidden lg:block text-xl font-bold text-gray-800 capitalize">{currentView}</h2>
                   </div>

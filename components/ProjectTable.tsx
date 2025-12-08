@@ -1,15 +1,17 @@
-
 import React, { useState } from 'react';
 import { Project, ProjectStatus } from '../types';
-import { ChevronRight, AlertCircle, ArrowUpRight, ArrowDownRight, Search, Filter } from 'lucide-react';
+import { ChevronRight, AlertCircle, ArrowUpRight, ArrowDownRight, Search, Filter, CalendarRange, ChevronDown } from 'lucide-react';
 
 interface ProjectTableProps {
   projects: Project[];
   onSelectProject: (project: Project) => void;
 }
 
+type TimeFilter = 'ALL' | 'THIS_MONTH' | 'NEXT_MONTH' | 'OVERDUE';
+
 export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectProject }) => {
-  const [filter, setFilter] = useState<'ALL' | 'ACTIVE' | 'RISK'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'RISK' | 'PENDING' | 'ARCHIVED'>('ALL');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Project; direction: 'asc' | 'desc' } | null>(null);
 
   // Helper to determine if a project is "At Risk" (Delayed or Over Budget)
@@ -20,9 +22,31 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
     return p.status === ProjectStatus.DELAYED || (budgetUsage > expectedUsage + 0.1);
   };
 
+  const checkTimeFilter = (p: Project) => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    switch (timeFilter) {
+        case 'THIS_MONTH':
+            return (p.scheduledStart.getMonth() === currentMonth && p.scheduledStart.getFullYear() === currentYear) ||
+                   (p.scheduledEnd.getMonth() === currentMonth && p.scheduledEnd.getFullYear() === currentYear);
+        case 'NEXT_MONTH':
+            const nextMonth = (currentMonth + 1) % 12;
+            const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+            return (p.scheduledStart.getMonth() === nextMonth && p.scheduledStart.getFullYear() === nextMonthYear) ||
+                   (p.scheduledEnd.getMonth() === nextMonth && p.scheduledEnd.getFullYear() === nextMonthYear);
+        case 'OVERDUE':
+            return p.scheduledEnd < now && p.progress < 100;
+        default:
+            return true;
+    }
+  };
+
   const filteredProjects = projects.filter(p => {
-    if (filter === 'ACTIVE') return p.status === ProjectStatus.ACTIVE;
-    if (filter === 'RISK') return isAtRisk(p);
+    if (!checkTimeFilter(p)) return false;
+    if (statusFilter === 'ACTIVE') return p.status === ProjectStatus.ACTIVE;
+    if (statusFilter === 'RISK') return isAtRisk(p);
     return true;
   });
 
@@ -57,40 +81,78 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
       {/* Table Controls */}
-      <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50/50">
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-           <div className="bg-white p-1 rounded-lg border border-gray-200 flex text-sm flex-shrink-0">
+      <div className="p-4 border-b border-gray-200 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-gray-50/50">
+        
+        {/* Status Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+           <div className="bg-white p-1 rounded-lg border border-gray-200 flex text-xs sm:text-sm shadow-sm">
               <button 
-                onClick={() => setFilter('ALL')}
-                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${filter === 'ALL' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setStatusFilter('ALL')}
+                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'ALL' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
               >
-                All Projects
+                All
               </button>
               <button 
-                onClick={() => setFilter('ACTIVE')}
-                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${filter === 'ACTIVE' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setStatusFilter('PENDING')}
+                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'PENDING' ? 'bg-yellow-50 text-yellow-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                Pending
+              </button>
+              <button 
+                onClick={() => setStatusFilter('ACTIVE')}
+                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'ACTIVE' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
               >
                 Active
               </button>
               <button 
-                onClick={() => setFilter('RISK')}
-                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${filter === 'RISK' ? 'bg-rose-50 text-rose-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setStatusFilter('RISK')}
+                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'RISK' ? 'bg-rose-50 text-rose-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
               >
                 At Risk
               </button>
+              <button 
+                onClick={() => setStatusFilter('ARCHIVED')}
+                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'ARCHIVED' ? 'bg-gray-50 text-gray-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                Archived
+              </button>
            </div>
         </div>
-        <div className="text-sm text-gray-500 hidden sm:block">
-           Showing {sortedProjects.length} projects
+
+        {/* Time Filter & Count */}
+        <div className="flex items-center gap-4 w-full xl:w-auto justify-between xl:justify-end">
+            <div className="relative group">
+                <button className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 shadow-sm hover:border-gray-300 z-20">
+                    <CalendarRange className="w-4 h-4 text-gray-500" />
+                    <span>
+                        {timeFilter === 'ALL' && 'All Time'}
+                        {timeFilter === 'THIS_MONTH' && 'This Month'}
+                        {timeFilter === 'NEXT_MONTH' && 'Next Month'}
+                        {timeFilter === 'OVERDUE' && 'Overdue'}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                </button>
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                    <button onClick={() => setTimeFilter('ALL')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg">All Time</button>
+                    <button onClick={() => setTimeFilter('THIS_MONTH')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Active This Month</button>
+                    <button onClick={() => setTimeFilter('NEXT_MONTH')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Scheduled Next Month</button>
+                    <button onClick={() => setTimeFilter('OVERDUE')} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 last:rounded-b-lg text-red-600">Overdue Projects</button>
+                </div>
+            </div>
+
+            <div className="text-sm text-gray-500 font-medium">
+                {sortedProjects.length} Projects
+            </div>
         </div>
       </div>
 
       {/* Desktop Table View (Hidden on mobile) */}
-      <div className="hidden md:block overflow-x-auto">
+      <div className="hidden md:block overflow-x-auto flex-1">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleSort('name')}>
                 Project & Client
@@ -179,7 +241,7 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
       </div>
 
       {/* Mobile Card List View (Visible on mobile) */}
-      <div className="md:hidden divide-y divide-gray-100">
+      <div className="md:hidden divide-y divide-gray-100 flex-1 overflow-y-auto">
         {sortedProjects.map((project) => {
             const budgetPercent = (project.spent / project.budget) * 100;
             const isOverBudget = budgetPercent > 100;
@@ -229,8 +291,12 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
       </div>
 
       {sortedProjects.length === 0 && (
-          <div className="p-12 text-center text-gray-500">
-              No projects found matching the criteria.
+          <div className="p-12 text-center text-gray-500 flex flex-col items-center justify-center h-full">
+              <div className="bg-gray-100 p-3 rounded-full mb-3">
+                <Search className="w-6 h-6 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900">No projects found</h3>
+              <p className="text-sm text-gray-500">Try adjusting your filters.</p>
           </div>
       )}
     </div>

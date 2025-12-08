@@ -1,18 +1,23 @@
 
 import React, { useState } from 'react';
 import { Project, ProjectStatus, WorkerLog, LogStatus } from '../types';
-import { Calendar, User, Zap, Clock, DollarSign, ArrowLeft, MoreHorizontal, Plus, FileText, CheckCircle2 } from 'lucide-react';
+import { Calendar, User, Zap, Clock, DollarSign, ArrowLeft, MoreHorizontal, Plus, FileText, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 
 // --- Worker Gantt Component (Reused logic) ---
 const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
-  if (logs.length === 0) return <div className="p-8 text-center text-gray-400 bg-gray-50 rounded-lg border border-dashed">No active shifts for today.</div>;
+const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ logs, currentDate }) => {
+  if (logs.length === 0) return (
+      <div className="py-12 flex flex-col items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <Clock className="w-10 h-10 mb-2 opacity-20" />
+          <p>No active shifts recorded for {currentDate.toLocaleDateString()}.</p>
+      </div>
+  );
 
-  let minTime = new Date();
+  let minTime = new Date(currentDate);
   minTime.setHours(8, 0, 0, 0);
-  let maxTime = new Date();
+  let maxTime = new Date(currentDate);
   maxTime.setHours(18, 0, 0, 0);
 
   logs.forEach(log => {
@@ -20,6 +25,8 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
     if (log.scheduledEnd > maxTime) maxTime = new Date(log.scheduledEnd);
     if (log.actualStart && log.actualStart < minTime) minTime = new Date(log.actualStart);
     const endRef = log.actualEnd || new Date();
+    // Only extend for "live" logs if they belong to today. If viewing past, clip it? 
+    // For simplicity, just use the endRef.
     if (endRef > maxTime) maxTime = endRef;
   });
 
@@ -38,6 +45,10 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
   }
 
   const now = new Date();
+  const isToday = currentDate.getDate() === now.getDate() && 
+                  currentDate.getMonth() === now.getMonth() && 
+                  currentDate.getFullYear() === now.getFullYear();
+                  
   const currentPos = getPos(now);
 
   return (
@@ -56,8 +67,9 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
             const schedLeft = getPos(log.scheduledStart);
             const schedWidth = getPos(log.scheduledEnd) - schedLeft;
             const actualStart = log.actualStart || log.scheduledStart;
-            const actualEnd = log.actualEnd || now;
-            const isLive = !log.actualEnd;
+            const actualEnd = log.actualEnd || (isToday ? now : log.scheduledEnd); // If looking at history and no end, assume filled schedule or handle differently
+            const isLive = !log.actualEnd && isToday;
+            
             const actualLeft = getPos(actualStart);
             const actualWidth = Math.max(1, getPos(actualEnd) - actualLeft);
             const barColor = isLive ? 'bg-green-500' : (log.status === LogStatus.APPROVED ? 'bg-blue-500' : 'bg-amber-400');
@@ -94,7 +106,7 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
             );
             })}
         </div>
-        {logs.some(l => l.scheduledStart.getDate() === now.getDate()) && currentPos > 0 && currentPos < 100 && (
+        {isToday && currentPos > 0 && currentPos < 100 && (
             <div className="absolute top-8 bottom-4 w-px bg-red-400 z-10 pointer-events-none border-l border-dashed border-red-500" style={{ left: `${currentPos}%` }}>
                 <div className="absolute -top-1 -translate-x-1/2 text-[9px] bg-red-500 text-white px-1 rounded shadow-sm whitespace-nowrap">Now</div>
             </div>
@@ -115,13 +127,86 @@ interface ProjectDetailProps {
 
 export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onBack, onAnalyze }) => {
   const [activeTab, setActiveTab] = useState<'LIVE' | 'FINANCE' | 'INFO'>('LIVE');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [dailyNotes, setDailyNotes] = useState<{ [dateKey: string]: string }>({});
+  const [noteSaved, setNoteSaved] = useState(false);
+  const [noteLastUpdated, setNoteLastUpdated] = useState<{ [dateKey: string]: Date }>({});
 
-  // Filter logs for Today (Live View)
-  const today = new Date();
-  const todaysLogs = logs.filter(l => 
-    l.scheduledStart.getDate() === today.getDate() && 
-    l.scheduledStart.getMonth() === today.getMonth() &&
-    l.scheduledStart.getFullYear() === today.getFullYear()
+  // Helper function to create consistent date key for storage
+  const getDateKey = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Get notes for current date
+  const currentDateKey = getDateKey(currentDate);
+  const currentNotes = dailyNotes[currentDateKey] || '';
+
+  // Handle notes change
+  const handleNotesChange = (value: string) => {
+    setDailyNotes(prev => ({
+      ...prev,
+      [currentDateKey]: value
+    }));
+    // Clear the saved feedback when user edits
+    setNoteSaved(false);
+  };
+
+  // Handle save notes
+  const handleSaveNotes = () => {
+    if (currentNotes.trim()) {
+      setNoteLastUpdated(prev => ({
+        ...prev,
+        [currentDateKey]: new Date()
+      }));
+      setNoteSaved(true);
+      // Clear saved feedback after 2 seconds
+      setTimeout(() => setNoteSaved(false), 2000);
+      // In a real app, you'd save to backend/localStorage here
+      console.log(`Notes saved for ${currentDateKey}:`, currentNotes);
+    }
+  };
+
+  // Handle clear notes
+  const handleClearNotes = () => {
+    if (window.confirm('Are you sure you want to clear these notes?')) {
+      setDailyNotes(prev => {
+        const updated = { ...prev };
+        delete updated[currentDateKey];
+        return updated;
+      });
+      setNoteLastUpdated(prev => {
+        const updated = { ...prev };
+        delete updated[currentDateKey];
+        return updated;
+      });
+    }
+  };
+
+  // Navigation Handlers
+  const handlePrevDay = () => {
+    const prev = new Date(currentDate);
+    prev.setDate(prev.getDate() - 1);
+    setCurrentDate(prev);
+  };
+
+  const handleNextDay = () => {
+    const next = new Date(currentDate);
+    next.setDate(next.getDate() + 1);
+    setCurrentDate(next);
+  };
+
+  const isToday = (d: Date) => {
+      const now = new Date();
+      return d.getDate() === now.getDate() && 
+             d.getMonth() === now.getMonth() && 
+             d.getFullYear() === now.getFullYear();
+  };
+
+  // Filter logs for selected Date
+  const displayLogs = logs.filter(l => 
+    l.scheduledStart.getDate() === currentDate.getDate() && 
+    l.scheduledStart.getMonth() === currentDate.getMonth() &&
+    l.scheduledStart.getFullYear() === currentDate.getFullYear()
   );
 
   // Financial Data Mockup
@@ -150,12 +235,6 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
                 </div>
             </div>
             <div className="flex items-center gap-2 w-full md:w-auto">
-                 <button 
-                    onClick={() => onAnalyze(project)}
-                    className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-indigo-200 whitespace-nowrap"
-                >
-                    <Zap className="w-4 h-4" /> <span className="md:inline">AI Insight</span>
-                </button>
                 <button className="p-2 text-gray-400 hover:text-gray-600">
                     <MoreHorizontal className="w-5 h-5" />
                 </button>
@@ -230,35 +309,81 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
                         <div className="animate-in fade-in duration-300">
                             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-3">
                                 <div>
-                                    <h3 className="text-lg font-bold text-gray-900">Today's Schedule</h3>
-                                    <p className="text-sm text-gray-500">Real-time tracking of active workers.</p>
+                                    <h3 className="text-lg font-bold text-gray-900">Daily Schedule</h3>
+                                    <p className="text-sm text-gray-500">Track worker shifts and progress.</p>
                                 </div>
-                                <button className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm w-full md:w-auto">
-                                    <Plus className="w-4 h-4" /> Assign Worker
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm">
+                                        <button onClick={handlePrevDay} className="p-2 hover:bg-gray-50 text-gray-500 border-r border-gray-200">
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <div className="px-4 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 min-w-[140px] justify-center">
+                                            <Calendar className="w-4 h-4 text-gray-400" />
+                                            {isToday(currentDate) ? 'Today' : currentDate.toLocaleDateString()}
+                                        </div>
+                                        <button onClick={handleNextDay} className="p-2 hover:bg-gray-50 text-gray-500 border-l border-gray-200">
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <button className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
+                                        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Assign</span>
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-4 md:p-6">
-                                <WorkerGanttChart logs={todaysLogs.length > 0 ? todaysLogs : logs.slice(0, 5)} />
+                                <WorkerGanttChart logs={displayLogs} currentDate={currentDate} />
                             </div>
 
-                            <div className="mt-8">
-                                <h4 className="font-semibold text-gray-800 mb-4">Recent Alerts</h4>
-                                <div className="space-y-3">
-                                    {logs.filter(l => l.notes && l.notes.length > 10).slice(0, 3).map(log => (
-                                        <div key={log.id} className="flex items-start gap-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
-                                            <div className="mt-0.5 flex-shrink-0">
-                                                <CheckCircle2 className="w-4 h-4 text-amber-500" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-900">{log.workerName}: {log.notes}</p>
-                                                <p className="text-xs text-gray-500">{log.scheduledStart.toLocaleDateString()}</p>
-                                            </div>
+                            <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="w-5 h-5 text-indigo-600" />
+                                        <h4 className="font-semibold text-lg text-gray-800">Daily Notes</h4>
+                                        {noteLastUpdated[currentDateKey] && (
+                                            <span className="text-xs text-gray-500 ml-2">
+                                                Updated {noteLastUpdated[currentDateKey].toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {noteSaved && (
+                                        <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+                                            <CheckCircle2 className="w-3 h-3" />
+                                            Saved
                                         </div>
-                                    ))}
-                                    {logs.every(l => !l.notes || l.notes.length <= 10) && (
-                                        <p className="text-sm text-gray-400 italic">No recent alerts or issues reported.</p>
                                     )}
+                                </div>
+                                <div className="space-y-3">
+                                    <textarea
+                                        value={currentNotes}
+                                        onChange={(e) => handleNotesChange(e.target.value)}
+                                        maxLength={500}
+                                        className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y text-sm text-gray-700 placeholder-gray-400"
+                                        placeholder="Add notes about today's operations, issues, achievements, or important updates..."
+                                    />
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-xs text-gray-500">
+                                            {currentNotes.length} / 500 characters
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {currentNotes.trim() && (
+                                                <button
+                                                    onClick={handleClearNotes}
+                                                    className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                                                >
+                                                    Clear
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={handleSaveNotes}
+                                                disabled={!currentNotes.trim()}
+                                                className="px-4 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                            >
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                Save Notes
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

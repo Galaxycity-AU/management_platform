@@ -1,3 +1,4 @@
+
 export enum ProjectStatus {
   PLANNING = 'Planning',
   ACTIVE = 'Active',
@@ -20,10 +21,22 @@ export interface WorkerLog {
   projectName: string;
   scheduledStart: Date;
   scheduledEnd: Date;
+  
+  // The final effective times (after adjustment)
   actualStart: Date | null;
   actualEnd: Date | null;
+
+  // The original times submitted by worker (for history comparison)
+  originalActualStart?: Date | null;
+  originalActualEnd?: Date | null;
+
   status: LogStatus;
   notes?: string;
+  
+  // Metadata for history
+  approvedBy?: string;
+  approvedAt?: Date;
+  adjustmentReason?: string;
 }
 
 export interface Project {
