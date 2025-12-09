@@ -1,139 +1,194 @@
-import express from 'express';
-import cors from 'cors';
-import { sequelize, Project, Job, Worker, Approval } from '../models/models/index.js';
+import express from "express";
+import mysql from "mysql2/promise";
+import cors from "cors";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
+
+console.log("Database Config:", {
+    host: process.env.SQL_HOST,
+    user: process.env.SQL_USER,
+    database: process.env.DATABASE_NAME,
+    port: process.env.SQL_PORT
+});
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Sync Database
-sequelize.sync({ alter: true })
-  .then(() => console.log("SQL Database synced"))
-  .catch(err => console.error(err));
+// Create database connection pool
+const db = mysql.createPool({
+    database: process.env.DATABASE_NAME,
+    user: process.env.SQL_USER,
+    password: process.env.SQL_PASSWORD,
+    host: process.env.SQL_HOST,
+    port: process.env.SQL_PORT ? Number(process.env.SQL_PORT) : 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
+
+// Test Database Connection
+db.getConnection()
+    .then(connection => {
+        console.log("SQL Database connected successfully");
+        connection.release();
+    })
+    .catch(err => console.error("Database connection error:", err));
 
 // ----------------- PROJECT ROUTES -----------------
 app.get("/projects", async (req, res) => {
-    const projects = await Project.findAll();
-    res.json(projects);
-});
-
-app.get("/projects/:id", async (req, res) => {
-    const project = await Project.findByPk(req.params.id);
-    if (!project) return res.status(404).json({ error: "Project not found" });
-    res.json(project);
-});
-
-app.post("/projects", async (req, res) => {
-    const newProject = await Project.create(req.body);
-    res.json(newProject);
-});
-
-app.put("/projects/:id", async (req, res) => {
-    const project = await Project.findByPk(req.params.id);
-    if (!project) return res.status(404).json({ error: "Project not found" });
-    await project.update(req.body);
-    res.json(project);
-});
-
-app.delete("/projects/:id", async (req, res) => {
-    const project = await Project.findByPk(req.params.id);
-    if (!project) return res.status(404).json({ error: "Project not found" });
-    await project.destroy();
-    res.json({ message: "Project deleted" });
+    try {
+        const [rows] = await db.query("SELECT * FROM projects");
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // ----------------- JOB ROUTES -----------------
 app.get("/jobs", async (req, res) => {
-    const jobs = await Job.findAll();
-    res.json(jobs);
+    try {
+        const [rows] = await db.query("SELECT * FROM jobs");
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-app.get("/jobs/:id", async (req, res) => {
-    const job = await Job.findByPk(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found" });
-    res.json(job);
+app.get("/jobs/project/:projectId", async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const [rows] = await db.query("SELECT * FROM jobs WHERE projectId = ?", [projectId]);
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put("/jobs/:id/justify", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { approverId, status, comments } = req.body;
+        
+        // Check if job exists
+        const [jobs] = await db.query("SELECT * FROM jobs WHERE id = ?", [id]);
+        if (jobs.length === 0) {
+            return res.status(404).json({ error: "Job not found" });
+        }
+
+        // Build update query dynamically
+        const updates = [];
+        const values = [];
+        
+        if (status !== undefined) {
+            updates.push("status = ?");
+            values.push(status);
+        }
+        if (approverId !== undefined) {
+            updates.push("approverId = ?");
+            values.push(approverId);
+        }
+        if (comments !== undefined) {
+            updates.push("comments = ?");
+            values.push(comments);
+        }
+        
+        if (updates.length > 0) {
+            values.push(id);
+            await db.query(`UPDATE jobs SET ${updates.join(", ")} WHERE id = ?`, values);
+        }
+        
+        // Fetch updated job
+        const [updatedJob] = await db.query("SELECT * FROM jobs WHERE id = ?", [id]);
+        res.json(updatedJob[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put("/jobs/:id/timeframe", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { startTime, endTime } = req.body;
+        
+        // Check if job exists
+        const [jobs] = await db.query("SELECT * FROM jobs WHERE id = ?", [id]);
+        if (jobs.length === 0) {
+            return res.status(404).json({ error: "Job not found" });
+        }
+
+        // Build update query dynamically
+        const updates = [];
+        const values = [];
+        
+        if (startTime !== undefined) {
+            updates.push("editedInTime = ?");
+            values.push(startTime);
+        }
+        if (endTime !== undefined) {
+            updates.push("editedOutTime = ?");
+            values.push(endTime);
+        }
+        
+        if (updates.length > 0) {
+            values.push(id);
+            await db.query(`UPDATE jobs SET ${updates.join(", ")} WHERE id = ?`, values);
+        }
+        
+        // Fetch updated job
+        const [updatedJob] = await db.query("SELECT * FROM jobs WHERE id = ?", [id]);
+        res.json(updatedJob[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post("/jobs", async (req, res) => {
-    const newJob = await Job.create(req.body);
-    res.json(newJob);
-});
-
-app.put("/jobs/:id", async (req, res) => {
-    const job = await Job.findByPk(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found" });
-    await job.update(req.body);
-    res.json(job);
-});
-
-app.delete("/jobs/:id", async (req, res) => {
-    const job = await Job.findByPk(req.params.id);
-    if (!job) return res.status(404).json({ error: "Job not found" });
-    await job.destroy();
-    res.json({ message: "Job deleted" });
+    try {
+        const jobData = req.body;
+        const fields = Object.keys(jobData);
+        const values = Object.values(jobData);
+        const placeholders = fields.map(() => "?").join(", ");
+        
+        const [result] = await db.query(
+            `INSERT INTO jobs (${fields.join(", ")}) VALUES (${placeholders})`,
+            values
+        );
+        
+        const [newJob] = await db.query("SELECT * FROM jobs WHERE id = ?", [result.insertId]);
+        res.status(201).json(newJob[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // ----------------- WORKER ROUTES -----------------
 app.get("/workers", async (req, res) => {
-    const workers = await Worker.findAll();
-    res.json(workers);
-});
-
-app.get("/workers/:id", async (req, res) => {
-    const worker = await Worker.findByPk(req.params.id);
-    if (!worker) return res.status(404).json({ error: "Worker not found" });
-    res.json(worker);
-});
-
-app.post("/workers", async (req, res) => {
-    const newWorker = await Worker.create(req.body);
-    res.json(newWorker);
-});
-
-app.put("/workers/:id", async (req, res) => {
-    const worker = await Worker.findByPk(req.params.id);
-    if (!worker) return res.status(404).json({ error: "Worker not found" });
-    await worker.update(req.body);
-    res.json(worker);
-});
-
-app.delete("/workers/:id", async (req, res) => {
-    const worker = await Worker.findByPk(req.params.id);
-    if (!worker) return res.status(404).json({ error: "Worker not found" });
-    await worker.destroy();
-    res.json({ message: "Worker deleted" });
+    try {
+        const [rows] = await db.query("SELECT * FROM workers");
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // ----------------- APPROVAL ROUTES -----------------
 app.get("/approvals", async (req, res) => {
-    const approvals = await Approval.findAll();
-    res.json(approvals);
+    try {
+        const [rows] = await db.query("SELECT * FROM approvals");
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
-app.get("/approvals/:id", async (req, res) => {
-    const approval = await Approval.findByPk(req.params.id);
-    if (!approval) return res.status(404).json({ error: "Approval not found" });
-    res.json(approval);
-});
-
-app.post("/approvals", async (req, res) => {
-    const newApproval = await Approval.create(req.body);
-    res.json(newApproval);
-});
-
-app.put("/approvals/:id", async (req, res) => {
-    const approval = await Approval.findByPk(req.params.id);
-    if (!approval) return res.status(404).json({ error: "Approval not found" });
-    await approval.update(req.body);
-    res.json(approval);
-});
-
-app.delete("/approvals/:id", async (req, res) => {
-    const approval = await Approval.findByPk(req.params.id);
-    if (!approval) return res.status(404).json({ error: "Approval not found" });
-    await approval.destroy();
-    res.json({ message: "Approval deleted" });
-});
 
 // ----------------- START SERVER -----------------
-app.listen(3001, () => console.log("API running on http://localhost:3001"));
+const API_PORT = process.env.API_PORT || 3001;
+app.listen(API_PORT, () => console.log(`API running on http://localhost:${API_PORT}`));

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu } from 'lucide-react';
 import { Project, WorkerLog, LogStatus, ProjectStatus } from './types';
-import { generateMockData } from './services/mockData';
 import { analyzeProjectHealth } from './services/geminiService';
 import { ProjectTable } from './components/ProjectTable';
 import { ProjectDetail } from './components/ProjectDetail';
@@ -25,11 +24,82 @@ function App() {
   const [aiAnalysisResult, setAiAnalysisResult] = useState<{ id: string, text: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Initial Data Load
+  // Fetch real data from backend API
   useEffect(() => {
-    const { projects: initialProjects, logs: initialLogs } = generateMockData();
-    setProjects(initialProjects);
-    setLogs(initialLogs);
+    const fetchData = async () => {
+      try {
+        // Fetch from backend API using CRUD functions
+        const [apiProjects, apiJobs, apiWorkers, apiApprovals] = await Promise.all([
+          fetch('/api/projects').then(res => res.json()),
+          fetch('/api/jobs').then(res => res.json()),
+          fetch('/api/workers').then(res => res.json()),
+          fetch('/api/approvals').then(res => res.json()),
+        ]);
+        
+        // Transform API data to Project[] type
+        const transformedProjects: Project[] = apiProjects.map((p: any, idx: number) => ({
+          id: `proj-${p.id}`,
+          name: p.title,
+          client: p.description || 'Unknown Client',
+          description: p.description || '',
+          status: p.status === 'active' ? ProjectStatus.ACTIVE : 
+                  p.status === 'completed' ? ProjectStatus.COMPLETED : 
+                  p.status === 'paused' ? ProjectStatus.DELAYED : ProjectStatus.PLANNING,
+          scheduledStart: new Date(p.createdAt),
+          scheduledEnd: new Date(p.deadline),
+          actualStart: new Date(p.createdAt),
+          progress: p.progress || 0,
+          budget: p.budget || 0,
+          spent: p.expenses || 0,
+          tags: [p.status]
+        }));
+
+        // Transform API data to WorkerLog[] type
+        const transformedLogs: WorkerLog[] = apiJobs.map((job: any) => {
+          const worker = apiWorkers.find((w: any) => w.id === job.workerId);
+          const approval = apiApprovals.find((a: any) => a.jobId === job.id);
+          const project = transformedProjects.find(p => p.id === `proj-${job.projectId}`);
+          
+          const scheduledStart = new Date(job.jobDate);
+          const [startHour, startMin] = job.startTime.split(':').map(Number);
+          const [endHour, endMin] = job.endTime.split(':').map(Number);
+          scheduledStart.setHours(startHour, startMin, 0, 0);
+          
+          const scheduledEnd = new Date(job.jobDate);
+          scheduledEnd.setHours(endHour, endMin, 0, 0);
+
+          return {
+            id: `log-${job.id}`,
+            projectId: `proj-${job.projectId}`,
+            projectName: project?.name || 'Unknown',
+            workerName: worker?.name || 'Unknown Worker',
+            role: worker?.position || 'Unknown Role',
+            scheduledStart,
+            scheduledEnd,
+            actualStart: job.clockedInTime ? new Date(`${job.jobDate}T${job.clockedInTime}`) : scheduledStart,
+            actualEnd: job.clockedOutTime ? new Date(`${job.jobDate}T${job.clockedOutTime}`) : null,
+            originalActualStart: job.editedInTime ? new Date(`${job.jobDate}T${job.editedInTime}`) : null,
+            originalActualEnd: job.editedOutTime ? new Date(`${job.jobDate}T${job.editedOutTime}`) : null,
+            status: approval?.status === 'approved' ? LogStatus.APPROVED : 
+                    approval?.status === 'rejected' ? LogStatus.REJECTED : LogStatus.PENDING,
+            notes: job.status || '',
+            approvedBy: approval ? 'Manager' : undefined,
+            approvedAt: approval ? new Date(approval.approvalDate) : undefined,
+            adjustmentReason: approval?.comments || undefined
+          };
+        });
+
+        setProjects(transformedProjects);
+        setLogs(transformedLogs);
+      } catch (err) {
+        console.error('Failed to fetch data from API:', err);
+        // Fallback to empty state if API fails
+        setProjects([]);
+        setLogs([]);
+      }
+    };
+
+    fetchData();
   }, []);
 
   // Stats Calculation
