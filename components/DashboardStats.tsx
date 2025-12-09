@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { DashboardStats } from '../types';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { Layers, Activity, AlertTriangle, Clock } from 'lucide-react';
+import CentraliseView from './centraliseView';
 
 interface Props {
   stats: DashboardStats;
@@ -53,43 +53,8 @@ export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData }
           <p className="text-2xl font-bold text-gray-900">{stats.pendingApprovals}</p>
         </div>
       </div>
-
-      {/* Charts Section */}
-      <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Status Distribution</h3>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={projectStatusData}
-              cx="50%"
-              cy="50%"
-              innerRadius={60}
-              outerRadius={80}
-              fill="#8884d8"
-              paddingAngle={5}
-              dataKey="value"
-            >
-              {projectStatusData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-80 flex flex-col justify-center items-center text-center">
-         <h3 className="text-lg font-semibold text-gray-900 mb-2">Platform Health</h3>
-         <p className="text-gray-500 max-w-md">
-           Currently tracking {stats.totalProjects} concurrent projects. 
-           {stats.delayedProjects > 0 ? 
-             ` Attention needed: ${stats.delayedProjects} projects are reporting delays.` : 
-             " All systems operational."}
-         </p>
-         <div className="mt-6 w-full h-4 bg-gray-100 rounded-full overflow-hidden">
-             <div className="h-full bg-green-500 transition-all duration-1000" style={{width: `${(stats.activeProjects / stats.totalProjects) * 100}%`}}></div>
-         </div>
-         <p className="text-xs text-gray-400 mt-2">Active Utilization</p>
+      <div className="col-span-full mt-6">
+        <CentraliseView />
       </div>
     </div>
   );

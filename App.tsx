@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu, Code } from 'lucide-react';
+import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu, Code, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Project, WorkerLog, LogStatus, ProjectStatus } from './types';
 import { generateMockData } from './services/mockData';
 import { analyzeProjectHealth } from './services/geminiService';
@@ -11,6 +11,7 @@ import { SimPROProjectDetail } from './components/SimPROProjectDetail';
 import { ApprovalQueue } from './components/ApprovalQueue';
 import { DashboardStatsView } from './components/DashboardStats';
 import API_Testing from './components/API_Testing';
+import { truncateClientName } from './utils/stringUtils';
 
 enum View {
   DASHBOARD = 'dashboard',
@@ -32,6 +33,18 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [aiAnalysisResult, setAiAnalysisResult] = useState<{ id: string, text: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // Sidebar collapse state with localStorage persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+  
+  const toggleSidebar = () => {
+    const newState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(newState);
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
+  };
 
   // Load SimPRO data from JSON file (no database connection - pure JSON array)
   const loadSimPROData = async () => {
@@ -42,6 +55,7 @@ function App() {
       // Convert date strings to Date objects for projects
       const projectsWithDates: Project[] = data.projects.map((p: any) => ({
         ...p,
+        client: truncateClientName(p.client || ''),
         scheduledStart: p.scheduledStart ? new Date(p.scheduledStart) : new Date(),
         scheduledEnd: p.scheduledEnd ? new Date(p.scheduledEnd) : new Date(),
         status: p.status as ProjectStatus,
@@ -154,60 +168,94 @@ function App() {
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row h-screen overflow-hidden">
       
       {/* Sidebar (Desktop only - LG breakpoint) */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-shrink-0 flex-col z-20">
-        <div className="p-6 border-b border-gray-100">
-          <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
-            <LayoutDashboard className="w-6 h-6" />
-            ProjectFlow
-          </h1>
+      <aside className={`hidden lg:flex ${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex-shrink-0 flex-col z-20 transition-all duration-300`}>
+        <div className={`p-6 border-b border-gray-100 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {!isSidebarCollapsed && (
+            <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
+              <LayoutDashboard className="w-6 h-6" />
+              ProjectFlow
+            </h1>
+          )}
+          {isSidebarCollapsed && (
+            <LayoutDashboard className="w-6 h-6 text-indigo-600" />
+          )}
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700"
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
         </div>
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
+        <nav className={`p-4 space-y-1 flex-1 overflow-y-auto ${isSidebarCollapsed ? 'items-center' : ''}`}>
           <button 
             onClick={() => handleSwitchView(View.DASHBOARD)}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.DASHBOARD ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.DASHBOARD ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            title={isSidebarCollapsed ? 'Dashboard' : undefined}
           >
-            <LayoutDashboard className="w-5 h-5" />
-            Dashboard
+            <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && <span>Dashboard</span>}
           </button>
           <button 
              onClick={() => handleSwitchView(View.PROJECTS)}
-             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? `Projects (${projects.length})` : undefined}
           >
-            <ListTodo className="w-5 h-5" />
-            Projects ({projects.length})
+            <ListTodo className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && (
+              <>
+                <span>Projects ({projects.length})</span>
+              </>
+            )}
           </button>
           <button 
              onClick={() => handleSwitchView(View.SIMPRO_PROJECTS)}
-             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.SIMPRO_PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.SIMPRO_PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? `SimPRO Projects (${simproProjects.length})` : undefined}
           >
-            <ListTodo className="w-5 h-5" />
-            SimPRO Projects ({simproProjects.length})
+            <ListTodo className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && (
+              <>
+                <span>SimPRO Projects ({simproProjects.length})</span>
+              </>
+            )}
           </button>
           <button 
              onClick={() => handleSwitchView(View.APPROVALS)}
-             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.APPROVALS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors relative ${currentView === View.APPROVALS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? `Approvals${stats.pendingApprovals > 0 ? ` (${stats.pendingApprovals})` : ''}` : undefined}
           >
-            <ClipboardCheck className="w-5 h-5" />
-            Approvals
-            {stats.pendingApprovals > 0 && (
-              <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{stats.pendingApprovals}</span>
+            <ClipboardCheck className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && (
+              <>
+                <span>Approvals</span>
+                {stats.pendingApprovals > 0 && (
+                  <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{stats.pendingApprovals}</span>
+                )}
+              </>
+            )}
+            {isSidebarCollapsed && stats.pendingApprovals > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             )}
           </button>
           <button 
              onClick={() => handleSwitchView(View.API_TESTING)}
-             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.API_TESTING ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.API_TESTING ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? 'API Testing' : undefined}
           >
-            <Code className="w-5 h-5" />
-            API Testing
+            <Code className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && <span>API Testing</span>}
           </button>
         </nav>
-        <div className="p-4 border-t border-gray-100">
-             <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200">
-                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">PM</div>
-                 <div>
+        <div className={`p-4 border-t border-gray-100 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
+             <div className={`flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200 ${isSidebarCollapsed ? 'w-8 h-8 p-0 justify-center' : ''}`}>
+                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">PM</div>
+                 {!isSidebarCollapsed && (
+                   <div>
                      <p className="text-xs font-bold text-gray-900">Project Manager</p>
                      <p className="text-[10px] text-gray-500">Admin Access</p>
-                 </div>
+                   </div>
+                 )}
              </div>
         </div>
       </aside>
