@@ -1,98 +1,150 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Menu, Clock, Filter } from 'lucide-react';
+import { fetchWorkers, fetchJobs, fetchProjects } from '../utils/apiUtils';
 
-const SimproScheduleView = () => {
+const CentraliseView = () => {
   const [blockHeight] = useState(1);
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today);
   const [selectedDate, setSelectedDate] = useState(today);
   const [showAll, setShowAll] = useState(true);
+  const [resources, setResources] = useState<Array<{ id: number; name: string; hours: number }>>([]);
+  const [scheduledJobs, setScheduledJobs] = useState<Array<{
+    id: number;
+    resourceId: number;
+    title: string;
+    subtitle?: string;
+    startHour: number;
+    duration: number;
+    date: Date;
+    color: string;
+    type: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const dateScrollRef = useRef(null);
   const resourceListScrollRef = useRef(null);
   const scheduleGridScrollRef = useRef(null);
   const isScrollingRef = useRef(false);
 
-  // Sample resources (staff members)
-  const resources = [
-    { id: 1854, name: 'Abel Van Rinh', hours: 1.5 },
-    { id: 1859, name: 'Ash Mohammadi', hours: 10.5 },
-    { id: 1860, name: 'Atefeh Halili', hours: 10.5 },
-    { id: 1852, name: 'Beau Gray', hours: 2 },
-    { id: 1577, name: 'Behrooz Ghaemi', hours: 0.25 },
-    { id: 1855, name: 'Boardroom - Avengers', hours: 10.5 },
-    { id: 1856, name: 'Boardroom - Batman', hours: 10.5 },
-    { id: 1857, name: 'Boardroom - Captain America', hours: 10.5 },
-    { id: 1858, name: 'Boardroom - Doctor Strange', hours: 10.5 },
-    { id: 1859, name: 'Boardroom - Iron Man', hours: 10.5 },
-    { id: 1860, name: 'Boardroom - Thor', hours: 10.5 },
-    { id: 1861, name: 'Boardroom - Wolverine', hours: 10.5 },
-    { id: 1862, name: 'Boardroom - X-Men', hours: 10.5 },
-    { id: 1863, name: 'Boardroom - X-Men 2', hours: 10.5 },
-    { id: 1864, name: 'Boardroom - X-Men 3', hours: 10.5 },
-    { id: 1865, name: 'Boardroom - X-Men 4', hours: 10.5 },
-    { id: 1866, name: 'Boardroom - X-Men 5', hours: 10.5 },
-    { id: 1867, name: 'Boardroom - X-Men 6', hours: 10.5 },
-    { id: 1868, name: 'Boardroom - X-Men 7', hours: 10.5 },
-    { id: 1869, name: 'Boardroom - X-Men 8', hours: 10.5 },
-    { id: 1870, name: 'Boardroom - X-Men 9', hours: 10.5 },
-    { id: 1871, name: 'Boardroom - X-Men 10', hours: 10.5 },
-  ];
+  // Helper function to parse time string (HH:MM:SS or HH:MM) to hours
+  const parseTimeToHours = (timeString: string): number => {
+    if (!timeString) return 0;
+    const parts = timeString.split(':');
+    const hours = parseInt(parts[0], 10) || 0;
+    const minutes = parseInt(parts[1], 10) || 0;
+    return hours + minutes / 60;
+  };
 
-  // Sample scheduled jobs
-  const scheduledJobs = [
-    {
-      id: 1,
-      resourceId: 1854,
-      title: '(9HRS) 7 SPRINGFIELD RD, BORONIA BORONIA',
-      startHour: 7,
-      duration: 9,
-      date: new Date(2025, 11, 4),
-      color: '#67e8f9',
-      type: 'job'
-    },
-    {
-      id: 2,
-      resourceId: 1852,
-      title: '(8.5HRS) LOT 1, 40 LIVERPOOL RD, KILSYTH KILSYTH',
-      subtitle: 'Travel',
-      startHour: 7,
-      duration: 8.5,
-      date: new Date(2025, 11, 4),
-      color: '#818cf8',
-      type: 'job'
-    },
-    {
-      id: 3,
-      resourceId: 1577,
-      title: '(10.75HRS) MELBOURNE BUSINESS PARK TRUGANINA 1300452285',
-      subtitle: 'Section 4 RFO Response Pricing Template',
-      startHour: 7,
-      duration: 10.75,
-      date: new Date(2025, 11, 4),
-      color: '#67e8f9',
-      type: 'job'
-    },
-    {
-      id: 4,
-      resourceId: 1855,
-      title: '(10HRS) PARADISE',
-      startHour: 7,
-      duration: 10,
-      date: new Date(2025, 11, 9),
-      color: '#818cf8',
-      type: 'job'
-    },
-    {
-      id: 5,
-      resourceId: 1859,
-      title: '(8HRS) DOWNTOWN PROJECT',
-      startHour: 8,
-      duration: 8,
-      date: new Date(2025, 11, 9),
-      color: '#67e8f9',
-      type: 'job'
+  // Helper function to calculate duration in hours from start and end time
+  const calculateDuration = (startTime: string, endTime: string): number => {
+    const start = parseTimeToHours(startTime);
+    const end = parseTimeToHours(endTime);
+    return end - start;
+  };
+
+  // Data loading function
+  const loadData = useCallback(async () => {
+    try {
+      console.log('Starting to fetch data from database...');
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching workers, jobs, and projects...');
+      const [workersData, jobsData, projectsData] = await Promise.all([
+        fetchWorkers(),
+        fetchJobs(),
+        fetchProjects()
+      ]);
+
+      console.log('Data fetched:', {
+        workers: workersData?.length || 0,
+        jobs: jobsData?.length || 0,
+        projects: projectsData?.length || 0
+      });
+
+      // Create a map of projects for quick lookup
+      const projectsMap = new Map(projectsData.map((p: any) => [p.id, p]));
+
+      // Transform workers to resources format
+      const transformedResources = workersData.map((worker: any) => {
+        // Calculate total hours for this worker from their jobs
+        const workerJobs = jobsData.filter((job: any) => job.workerId === worker.id);
+        const totalHours = workerJobs.reduce((sum: number, job: any) => {
+          if (job.startTime && job.endTime) {
+            return sum + calculateDuration(job.startTime, job.endTime);
+          }
+          return sum;
+        }, 0);
+
+        return {
+          id: worker.id,
+          name: worker.name,
+          hours: totalHours
+        };
+      });
+
+      console.log('Transformed resources:', transformedResources.length);
+      setResources(transformedResources);
+
+      // Transform jobs to scheduledJobs format
+      const transformedJobs = jobsData
+        .filter((job: any) => job.startTime && job.endTime && job.jobDate) // Only include jobs with valid time data
+        .map((job: any) => {
+          const project = projectsMap.get(job.projectId);
+          const projectTitle = project?.title || `Project ${job.projectId}`;
+          
+          const startHour = parseTimeToHours(job.startTime);
+          const duration = calculateDuration(job.startTime, job.endTime);
+          
+          // Skip jobs with invalid duration
+          if (duration <= 0) return null;
+          
+          // Parse jobDate to Date object
+          const jobDate = new Date(job.jobDate);
+          
+          // Skip invalid dates
+          if (isNaN(jobDate.getTime())) return null;
+          
+          // Generate color based on job id (for visual distinction)
+          const colors = ['#67e8f9', '#818cf8', '#a78bfa', '#f472b6', '#fb7185'];
+          const color = colors[job.id % colors.length];
+
+          return {
+            id: job.id,
+            resourceId: job.workerId,
+            title: `(${duration.toFixed(2)}HRS) ${projectTitle}`,
+            subtitle: project?.description || undefined,
+            startHour: startHour,
+            duration: duration,
+            date: jobDate,
+            color: color,
+            type: 'job'
+          };
+        })
+        .filter((job: any) => job !== null); // Remove null entries
+
+      console.log('Transformed jobs:', transformedJobs.length);
+      setScheduledJobs(transformedJobs);
+      console.log('Data loading completed successfully');
+      setError(null);
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      const errorMessage = error?.message || 'Failed to load schedule data. Please check if the server is running.';
+      setError(errorMessage);
+      // Set empty arrays on error so the UI doesn't break
+      setResources([]);
+      setScheduledJobs([]);
+    } finally {
+      setLoading(false);
+      console.log('Loading state set to false');
     }
-  ];
+  }, []);
+
+  // Fetch data from database on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const generateDates = () => {
     const dates = [];
@@ -213,6 +265,9 @@ const SimproScheduleView = () => {
   }, [dates, currentMonth]);
 
   useEffect(() => {
+    // Wait for resources to load before setting up scroll synchronization
+    if (loading || resources.length === 0) return;
+
     const resourceList = resourceListScrollRef.current;
     const scheduleGrid = scheduleGridScrollRef.current;
 
@@ -243,9 +298,36 @@ const SimproScheduleView = () => {
       resourceList.removeEventListener('scroll', handleResourceScroll);
       scheduleGrid.removeEventListener('scroll', handleScheduleScroll);
     };
-  }, []);
+  }, [loading, resources.length]);
 
   const rowHeight = 60 * blockHeight;
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="text-lg text-gray-600">Loading schedule data...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-white">
+        <div className="text-center max-w-md">
+          <div className="text-lg text-red-600 font-semibold mb-2">Error Loading Data</div>
+          <div className="text-sm text-gray-600 mb-4">{error}</div>
+          <button
+            onClick={loadData}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-white">
@@ -334,7 +416,7 @@ const SimproScheduleView = () => {
           >
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-700">Individual Resources</span>
-              <label className="flex items-center gap-2 text-xs text-gray-600 ml-2">
+              <label className="flex items-center gap-2 text-xxs text-gray-600 ml-2">
                 <input
                   type="checkbox"
                   checked={showAll}
@@ -344,9 +426,6 @@ const SimproScheduleView = () => {
                 Show All
               </label>
             </div>
-            <button className="text-gray-400 hover:text-gray-600">
-              <Menu className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Resource List with synchronized scroll */}
@@ -472,7 +551,7 @@ const SimproScheduleView = () => {
                         color: '#000'
                       }}
                     >
-                      <div className="font-semibold truncate">{job.title}</div>
+                      <div className="font-semibold truncate">{job.resourceId} - {job.title}</div>
                       {job.subtitle && (
                         <div className="text-xs opacity-80 truncate mt-0.5">{job.subtitle}</div>
                       )}
@@ -488,4 +567,4 @@ const SimproScheduleView = () => {
   );
 };
 
-export default SimproScheduleView;
+export default CentraliseView;
