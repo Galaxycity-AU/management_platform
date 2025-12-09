@@ -3,12 +3,12 @@ import { Project, ProjectStatus } from '../types';
 import { ChevronRight, AlertCircle, ArrowUpRight, ArrowDownRight, Search, Filter, CalendarRange, ChevronDown } from 'lucide-react';
 import { getStatusColor, isAtRisk, checkTimeFilter, type TimeFilter } from '../utils';
 
-interface ProjectTableProps {
+interface SimPROProjectTableProps {
   projects: Project[];
   onSelectProject: (project: Project) => void;
 }
 
-export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectProject }) => {
+export const SimPROProjectTable: React.FC<SimPROProjectTableProps> = ({ projects, onSelectProject }) => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'RISK' | 'PENDING' | 'ARCHIVED'>('ALL');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Project; direction: 'asc' | 'desc' } | null>(null);
@@ -121,9 +121,9 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleSort('status')}>
                 Status
               </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleSort('progress')}>
+              {/* <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleSort('progress')}>
                 Progress
-              </th>
+              </th> */}
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100" onClick={() => handleSort('budget')}>
                 Budget Health
               </th>
@@ -163,7 +163,7 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
                       {project.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap align-middle">
+                  {/* <td className="px-6 py-4 whitespace-nowrap align-middle">
                     <div className="w-full max-w-[100px]">
                         <div className="flex justify-between text-xs mb-1">
                             <span className="text-gray-600 font-medium">{project.progress}%</span>
@@ -172,7 +172,7 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
                             <div className="bg-indigo-600 h-1.5 rounded-full" style={{ width: `${project.progress}%` }}></div>
                         </div>
                     </div>
-                  </td>
+                  </td> */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
                         <div className="text-sm text-gray-900 font-medium">
@@ -263,3 +263,4 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
     </div>
   );
 };
+

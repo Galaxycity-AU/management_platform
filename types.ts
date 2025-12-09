@@ -39,6 +39,33 @@ export interface WorkerLog {
   adjustmentReason?: string;
 }
 
+export interface ScheduleBlock {
+  Hrs: number;
+  StartTime: string;
+  ISO8601StartTime: string;
+  EndTime: string;
+  ISO8601EndTime: string;
+  ScheduleRate?: {
+    ID: number;
+    Name: string;
+  };
+}
+
+export interface Schedule {
+  ID: number;
+  Type: string;
+  Reference: string;
+  TotalHours: number;
+  Staff?: {
+    ID: number;
+    Name: string;
+    Type: string;
+    TypeId: number;
+  };
+  Date: string;
+  Blocks: ScheduleBlock[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -53,6 +80,7 @@ export interface Project {
   budget: number;
   spent: number;
   tags: string[];
+  schedules?: Schedule[];
 }
 
 export interface DashboardStats {

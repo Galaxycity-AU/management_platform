@@ -1,9 +1,9 @@
 import React from 'react';
-import { Project, ProjectStatus, WorkerLog, LogStatus } from '../types';
+import { Project, ProjectStatus, WorkerLog, LogStatus, Schedule } from '../types';
 import { Calendar, User, Zap, Clock, AlertCircle } from 'lucide-react';
-import { getStatusColorCard, formatDate, filterTodaysLogs } from '../utils';
+import { getStatusColorCard, formatDate, filterTodaysLogs, filterUpcomingSchedules } from '../utils';
 
-interface ProjectCardProps {
+interface SimPROProjectCardProps {
   project: Project;
   logs: WorkerLog[]; // Pass logs related to this project
   onAnalyze: (p: Project) => void;
@@ -12,9 +12,52 @@ interface ProjectCardProps {
 // Helper to format time
 const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-// A Unified Gantt Chart Component for Workers
-const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
-  if (logs.length === 0) return null;
+// Extended type for timeline items (logs + schedules)
+type TimelineItem = WorkerLog & {
+  isSchedule?: boolean;
+  scheduleData?: Schedule;
+  blockData?: Schedule['Blocks'][0];
+};
+
+// A Unified Gantt Chart Component for Workers and Schedules
+const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; schedules?: Schedule[] }> = ({ logs, schedules = [] }) => {
+  // Convert schedules to timeline items
+  const scheduleItems: TimelineItem[] = schedules.map(schedule => {
+    const scheduleDate = schedule.Date ? new Date(schedule.Date) : new Date();
+    
+    // Process each block in the schedule
+    return schedule.Blocks?.map((block, blockIdx): TimelineItem => {
+      const [startHour, startMin] = block.StartTime.split(':').map(Number);
+      const [endHour, endMin] = block.EndTime.split(':').map(Number);
+      
+      const startTime = new Date(scheduleDate);
+      startTime.setHours(startHour, startMin, 0, 0);
+      
+      const endTime = new Date(scheduleDate);
+      endTime.setHours(endHour, endMin, 0, 0);
+      
+      return {
+        id: `schedule-${schedule.ID}-${blockIdx}`,
+        workerName: schedule.Staff?.Name || 'Unassigned',
+        role: schedule.Staff?.Type || 'Schedule',
+        projectId: '',
+        projectName: '',
+        scheduledStart: startTime,
+        scheduledEnd: endTime,
+        actualStart: null,
+        actualEnd: null,
+        status: LogStatus.PENDING,
+        isSchedule: true,
+        scheduleData: schedule,
+        blockData: block,
+      };
+    }) || [];
+  }).flat();
+  
+  // Combine logs and schedule items
+  const allItems: TimelineItem[] = [...logs.map(log => ({ ...log, isSchedule: false })), ...scheduleItems];
+  
+  if (allItems.length === 0) return null;
 
   // 1. Determine Time Range for the Chart
   // Default to 08:00 AM to 06:00 PM (10 hours) unless logs go outside
@@ -24,13 +67,13 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
   let maxTime = new Date();
   maxTime.setHours(18, 0, 0, 0);
 
-  // Expand range based on actual log data
-  logs.forEach(log => {
-    if (log.scheduledStart < minTime) minTime = new Date(log.scheduledStart);
-    if (log.scheduledEnd > maxTime) maxTime = new Date(log.scheduledEnd);
-    if (log.actualStart && log.actualStart < minTime) minTime = new Date(log.actualStart);
+  // Expand range based on actual log and schedule data
+  allItems.forEach(item => {
+    if (item.scheduledStart < minTime) minTime = new Date(item.scheduledStart);
+    if (item.scheduledEnd > maxTime) maxTime = new Date(item.scheduledEnd);
+    if (item.actualStart && item.actualStart < minTime) minTime = new Date(item.actualStart);
     // For end time, if it's active, we might want to extend to "Now" if now > maxTime
-    const endRef = log.actualEnd || new Date();
+    const endRef = item.actualEnd || new Date();
     if (endRef > maxTime) maxTime = endRef;
   });
 
@@ -59,7 +102,7 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
 
   const now = new Date();
   const currentPos = getPos(now);
-  const isToday = logs.some(l => l.scheduledStart.getDate() === now.getDate());
+  const isToday = allItems.some(item => item.scheduledStart.getDate() === now.getDate());
 
   return (
     <div className="mt-4">
@@ -78,27 +121,32 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
 
       {/* Workers Rows */}
       <div className="space-y-4">
-        {logs.map((log) => {
-          const schedLeft = getPos(log.scheduledStart);
-          const schedWidth = getPos(log.scheduledEnd) - schedLeft;
+        {allItems.map((item) => {
+          const schedLeft = getPos(item.scheduledStart);
+          const schedWidth = getPos(item.scheduledEnd) - schedLeft;
           
-          const actualStart = log.actualStart || log.scheduledStart; // Fallback for display if null (rare)
-          const actualEnd = log.actualEnd || now;
-          const isLive = !log.actualEnd;
+          const actualStart = item.actualStart || (item.isSchedule ? null : item.scheduledStart);
+          const actualEnd = item.actualEnd || (item.isSchedule ? null : now);
+          const isLive = !item.actualEnd && !item.isSchedule;
           
-          const actualLeft = getPos(actualStart);
-          const actualWidth = Math.max(1, getPos(actualEnd) - actualLeft); // Min width 1%
+          const actualLeft = actualStart ? getPos(actualStart) : schedLeft;
+          const actualWidth = actualStart ? Math.max(1, getPos(actualEnd) - actualLeft) : 0;
 
-          // Status colors
-          const barColor = isLive ? 'bg-green-500' : (log.status === LogStatus.APPROVED ? 'bg-blue-500' : 'bg-amber-400');
+          // Status colors - schedules use different styling
+          let barColor = 'bg-indigo-500';
+          if (!item.isSchedule) {
+            barColor = isLive ? 'bg-green-500' : (item.status === LogStatus.APPROVED ? 'bg-blue-500' : 'bg-amber-400');
+          }
           
           return (
-            <div key={log.id} className="group relative">
+            <div key={item.id} className="group relative">
               {/* Row Content */}
               <div className="flex items-center gap-4 mb-1">
                  <div className="w-32 flex-shrink-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{log.workerName}</p>
-                    <p className="text-xs text-gray-500 truncate">{log.role}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{item.workerName}</p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {item.isSchedule ? 'Scheduled' : item.role}
+                    </p>
                  </div>
                  
                  {/* Timeline Track */}
@@ -110,12 +158,22 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
 
                     {/* Scheduled Bar (Background) */}
                     <div 
-                        className="absolute top-1.5 h-5 bg-indigo-100/50 border border-indigo-200 border-dashed rounded-sm"
+                        className={`absolute top-1.5 h-5 rounded-sm ${
+                          item.isSchedule 
+                            ? 'bg-indigo-100 border border-indigo-300' 
+                            : 'bg-indigo-100/50 border border-indigo-200 border-dashed'
+                        }`}
                         style={{ left: `${schedLeft}%`, width: `${schedWidth}%` }}
-                    ></div>
+                    >
+                      {item.isSchedule && item.blockData && (
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-indigo-700">
+                          {item.blockData.Hrs}h
+                        </span>
+                      )}
+                    </div>
 
-                    {/* Actual Bar (Foreground) */}
-                    {log.actualStart && (
+                    {/* Actual Bar (Foreground) - only for logs, not schedules */}
+                    {!item.isSchedule && item.actualStart && (
                          <div 
                             className={`absolute top-2.5 h-3 rounded-full shadow-sm ${barColor} transition-all duration-500`}
                             style={{ left: `${actualLeft}%`, width: `${actualWidth}%` }}
@@ -129,12 +187,25 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
 
                  {/* Text Values */}
                  <div className="w-24 flex-shrink-0 text-right">
-                     <div className={`text-xs font-semibold ${isLive ? 'text-green-600' : 'text-gray-600'}`}>
-                        {isLive ? 'Active' : 'Done'}
-                     </div>
-                     <div className="text-[10px] text-gray-400">
-                        {log.actualStart ? formatTime(log.actualStart) : '--'} - {isLive ? 'Now' : (log.actualEnd ? formatTime(log.actualEnd) : '--')}
-                     </div>
+                     {item.isSchedule ? (
+                       <>
+                         <div className="text-xs font-semibold text-indigo-600">
+                           Scheduled
+                         </div>
+                         <div className="text-[10px] text-gray-400">
+                           {formatTime(item.scheduledStart)} - {formatTime(item.scheduledEnd)}
+                         </div>
+                       </>
+                     ) : (
+                       <>
+                         <div className={`text-xs font-semibold ${isLive ? 'text-green-600' : 'text-gray-600'}`}>
+                           {isLive ? 'Active' : 'Done'}
+                         </div>
+                         <div className="text-[10px] text-gray-400">
+                           {item.actualStart ? formatTime(item.actualStart) : '--'} - {isLive ? 'Now' : (item.actualEnd ? formatTime(item.actualEnd) : '--')}
+                         </div>
+                       </>
+                     )}
                  </div>
               </div>
             </div>
@@ -150,8 +221,9 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
       )}
       
       {/* Legend */}
-      <div className="flex gap-4 mt-4 text-[10px] text-gray-500 justify-end">
-         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-100 border border-indigo-200 border-dashed"></div> Scheduled</div>
+      <div className="flex gap-4 mt-4 text-[10px] text-gray-500 justify-end flex-wrap">
+         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-100 border border-indigo-300"></div> Schedule</div>
+         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-100 border border-indigo-200 border-dashed"></div> Log Scheduled</div>
          <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div> Active</div>
          <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> Completed</div>
          <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded-full"></div> Pending Review</div>
@@ -161,10 +233,13 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
 };
 
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, logs, onAnalyze }) => {
-  // Filter for display: Show only logs relevant to the current "view" (e.g., Today's active/recent logs)
+export const SimPROProjectCard: React.FC<SimPROProjectCardProps> = ({ project, logs, onAnalyze }) => {
+  // Filter for display: Show only logs and schedules relevant to the current "view" (e.g., Today's active/recent logs)
   // For this UI, we assume we are looking at "Today's" timeline or the most recent active day
   const todaysLogs = filterTodaysLogs(logs);
+  
+  // Filter today's and upcoming schedules (next 7 days)
+  const upcomingSchedules = project.schedules ? filterUpcomingSchedules(project.schedules, 7) : [];
   
   // If no logs today, maybe show the most recent 3 logs? 
   // For parallel view to make sense, they should probably be on the same day.
@@ -206,21 +281,21 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, logs, onAnaly
       {/* Stats Bar */}
       <div className="px-6 py-3 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between text-sm">
          <div className="flex gap-6">
-             <div className="flex flex-col">
+             {/* <div className="flex flex-col">
                  <span className="text-xs text-gray-400 uppercase">Progress</span>
                  <span className="font-semibold text-gray-700">{project.progress}%</span>
-             </div>
+             </div> */}
              <div className="flex flex-col">
                  <span className="text-xs text-gray-400 uppercase">Budget</span>
                  <span className="font-semibold text-gray-700">${project.spent.toLocaleString()} / ${project.budget.toLocaleString()}</span>
              </div>
          </div>
          {/* Simple Progress Bar */}
-         <div className="w-1/3 max-w-xs">
+         {/* <div className="w-1/3 max-w-xs">
              <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                  <div className={`h-full ${project.status === ProjectStatus.DELAYED ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${project.progress}%` }}></div>
              </div>
-         </div>
+         </div> */}
       </div>
 
       {/* Workers / Timeline Section */}
@@ -230,8 +305,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, logs, onAnaly
             {isHistorical ? 'Recent Activity' : 'Live Schedule & Status'}
         </h4>
         
-        {displayLogs.length > 0 ? (
-            <WorkerGanttChart logs={displayLogs} />
+        {displayLogs.length > 0 || upcomingSchedules.length > 0 ? (
+            <WorkerGanttChart logs={displayLogs} schedules={upcomingSchedules} />
         ) : (
             <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200 mt-4">
                 No active schedule for today.
@@ -246,6 +321,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, logs, onAnaly
             </div>
         )}
       </div>
+
     </div>
   );
 };

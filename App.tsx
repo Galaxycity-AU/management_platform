@@ -1,35 +1,81 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu } from 'lucide-react';
+import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu, Code } from 'lucide-react';
 import { Project, WorkerLog, LogStatus, ProjectStatus } from './types';
 import { generateMockData } from './services/mockData';
 import { analyzeProjectHealth } from './services/geminiService';
 import { ProjectTable } from './components/ProjectTable';
 import { ProjectDetail } from './components/ProjectDetail';
+import { SimPROProjectTable } from './components/SimPROProjectTable';
+import { SimPROProjectDetail } from './components/SimPROProjectDetail';
 import { ApprovalQueue } from './components/ApprovalQueue';
 import { DashboardStatsView } from './components/DashboardStats';
+import API_Testing from './components/API_Testing';
 
 enum View {
   DASHBOARD = 'dashboard',
   PROJECTS = 'projects',
+  SIMPRO_PROJECTS = 'simpro-projects',
   APPROVALS = 'approvals',
+  API_TESTING = 'api-testing',
 }
 
 function App() {
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs] = useState<WorkerLog[]>([]);
+  const [simproProjects, setSimproProjects] = useState<Project[]>([]);
+  const [simproLogs, setSimproLogs] = useState<WorkerLog[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedSimPROProject, setSelectedSimPROProject] = useState<Project | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [aiAnalysisResult, setAiAnalysisResult] = useState<{ id: string, text: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Load SimPRO data from JSON file (no database connection - pure JSON array)
+  const loadSimPROData = async () => {
+    try {
+      const response = await fetch('data/simproProjects.json');
+      const data = await response.json();
+      
+      // Convert date strings to Date objects for projects
+      const projectsWithDates: Project[] = data.projects.map((p: any) => ({
+        ...p,
+        scheduledStart: p.scheduledStart ? new Date(p.scheduledStart) : new Date(),
+        scheduledEnd: p.scheduledEnd ? new Date(p.scheduledEnd) : new Date(),
+        status: p.status as ProjectStatus,
+        schedules: p.schedules || [], // Include schedules array
+      }));
+      
+      // Convert date strings to Date objects for logs
+      const logsWithDates: WorkerLog[] = data.logs.map((l: any) => ({
+        ...l,
+        scheduledStart: new Date(l.scheduledStart),
+        scheduledEnd: new Date(l.scheduledEnd),
+        actualStart: l.actualStart ? new Date(l.actualStart) : null,
+        actualEnd: l.actualEnd ? new Date(l.actualEnd) : null,
+        status: l.status as LogStatus,
+      }));
+      
+      setSimproProjects(projectsWithDates);
+      setSimproLogs(logsWithDates);
+    } catch (error) {
+      console.error('Error loading SimPRO data:', error);
+      // Fallback to empty arrays if JSON file fails to load
+      setSimproProjects([]);
+      setSimproLogs([]);
+    }
+  };
 
   // Initial Data Load
   useEffect(() => {
     const { projects: initialProjects, logs: initialLogs } = generateMockData();
     setProjects(initialProjects);
     setLogs(initialLogs);
+    
+    // Load SimPRO data from JSON
+    loadSimPROData();
   }, []);
 
   // Stats Calculation
@@ -84,14 +130,24 @@ function App() {
     setCurrentView(View.PROJECTS);
   };
 
+  const handleSelectSimPROProject = (project: Project) => {
+    setSelectedSimPROProject(project);
+    setCurrentView(View.SIMPRO_PROJECTS);
+  };
+
   const handleBackToTable = () => {
       setSelectedProject(null);
+  };
+
+  const handleBackToSimPROTable = () => {
+      setSelectedSimPROProject(null);
   };
 
   // Switch views resets selection
   const handleSwitchView = (view: View) => {
       setCurrentView(view);
       setSelectedProject(null);
+      setSelectedSimPROProject(null);
   };
 
   return (
@@ -121,6 +177,13 @@ function App() {
             Projects ({projects.length})
           </button>
           <button 
+             onClick={() => handleSwitchView(View.SIMPRO_PROJECTS)}
+             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.SIMPRO_PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            <ListTodo className="w-5 h-5" />
+            SimPRO Projects ({simproProjects.length})
+          </button>
+          <button 
              onClick={() => handleSwitchView(View.APPROVALS)}
              className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.APPROVALS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
           >
@@ -129,6 +192,13 @@ function App() {
             {stats.pendingApprovals > 0 && (
               <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{stats.pendingApprovals}</span>
             )}
+          </button>
+          <button 
+             onClick={() => handleSwitchView(View.API_TESTING)}
+             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.API_TESTING ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+          >
+            <Code className="w-5 h-5" />
+            API Testing
           </button>
         </nav>
         <div className="p-4 border-t border-gray-100">
@@ -151,6 +221,13 @@ function App() {
                 project={selectedProject}
                 logs={logs.filter(l => l.projectId === selectedProject.id)}
                 onBack={handleBackToTable}
+                onAnalyze={handleAnalyzeProject}
+            />
+        ) : selectedSimPROProject ? (
+            <SimPROProjectDetail 
+                project={selectedSimPROProject}
+                logs={simproLogs.filter(l => l.projectId === selectedSimPROProject.id)}
+                onBack={handleBackToSimPROTable}
                 onAnalyze={handleAnalyzeProject}
             />
         ) : (
@@ -230,6 +307,19 @@ function App() {
                     </div>
                   )}
 
+                  {/* SimPRO Projects View */}
+                  {currentView === View.SIMPRO_PROJECTS && (
+                    <div className="max-w-full h-full">
+                      <SimPROProjectTable 
+                        projects={simproProjects.filter(p => 
+                            p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            p.client.toLowerCase().includes(searchQuery.toLowerCase())
+                        )} 
+                        onSelectProject={handleSelectSimPROProject} 
+                      />
+                    </div>
+                  )}
+
                   {/* Approvals View */}
                   {currentView === View.APPROVALS && (
                     <div className="max-w-5xl mx-auto">
@@ -240,12 +330,20 @@ function App() {
                       />
                     </div>
                   )}
+
+                  {
+                    currentView === View.API_TESTING && (
+                      <div className="max-w-5xl mx-auto">
+                        <API_Testing />
+                      </div>
+                    )
+                  }
                 </div>
             </>
         )}
 
         {/* Bottom Navigation (Mobile & Tablet - Visible below LG) */}
-        {!selectedProject && (
+        {!selectedProject && !selectedSimPROProject && (
             <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around p-2 z-30 pb-safe">
                 <button 
                     onClick={() => handleSwitchView(View.DASHBOARD)}

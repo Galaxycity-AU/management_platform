@@ -1,0 +1,1442 @@
+{
+  "projects": [
+    {
+      "id": "2495",
+      "name": "60-68 Lampard Road, Drouin",
+      "client": "HOUSING INVESTMENTS PTY ",
+      "description": " ",
+      "status": "ACTIVE",
+      "progress": 65,
+      "budget": 1236758.18,
+      "spent": 1236758.18,
+      "scheduledStart": "2024-01-15T00:00:00.000Z",
+      "scheduledEnd": "2024-04-30T00:00:00.000Z",
+      "tags": [
+        "Commercial",
+        "Installation",
+        "High Priority"
+      ],
+      "schedules": [
+        {
+          "ID": 29844,
+          "Type": "job",
+          "Reference": "2495-3285",
+          "TotalHours": 9,
+          "Staff": {
+            "ID": 1801,
+            "Name": "Mark Stanovic",
+            "Type": "employee",
+            "TypeId": 1801
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 9,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-09T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2741",
+      "name": "Melbourne Business Park",
+      "client": "Quad Sol",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29679,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 9,
+          "Staff": {
+            "ID": 1837,
+            "Name": "Erfan Kashiri",
+            "Type": "employee",
+            "TypeId": 1837
+          },
+          "Date": "2025-12-12",
+          "Blocks": [
+            {
+              "Hrs": 9,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-12T07:00:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-12T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27008,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1648,
+            "Name": "Hi Solar",
+            "Type": "contractor",
+            "TypeId": 1648
+          },
+          "Date": "2025-12-12",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-12T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-12T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27007,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1802,
+            "Name": "Chris Arundel",
+            "Type": "employee",
+            "TypeId": 1802
+          },
+          "Date": "2025-12-12",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-12T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-12T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27005,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1802,
+            "Name": "Chris Arundel",
+            "Type": "employee",
+            "TypeId": 1802
+          },
+          "Date": "2025-12-11",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-11T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-11T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29678,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 9,
+          "Staff": {
+            "ID": 1837,
+            "Name": "Erfan Kashiri",
+            "Type": "employee",
+            "TypeId": 1837
+          },
+          "Date": "2025-12-11",
+          "Blocks": [
+            {
+              "Hrs": 9,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-11T07:00:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-11T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27006,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1648,
+            "Name": "Hi Solar",
+            "Type": "contractor",
+            "TypeId": 1648
+          },
+          "Date": "2025-12-11",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-11T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-11T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29216,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1577,
+            "Name": "Behrooz Ghaemi",
+            "Type": "employee",
+            "TypeId": 1577
+          },
+          "Date": "2025-12-11",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-11T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-11T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29155,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1646,
+            "Name": "BuildUno Pty Ltd",
+            "Type": "contractor",
+            "TypeId": 1646
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-10T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29154,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1577,
+            "Name": "Behrooz Ghaemi",
+            "Type": "employee",
+            "TypeId": 1577
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-10T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27010,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1648,
+            "Name": "Hi Solar",
+            "Type": "contractor",
+            "TypeId": 1648
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-10T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27009,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1802,
+            "Name": "Chris Arundel",
+            "Type": "employee",
+            "TypeId": 1802
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-10T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27011,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1802,
+            "Name": "Chris Arundel",
+            "Type": "employee",
+            "TypeId": 1802
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-09T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29152,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1577,
+            "Name": "Behrooz Ghaemi",
+            "Type": "employee",
+            "TypeId": 1577
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-09T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 27012,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1648,
+            "Name": "Hi Solar",
+            "Type": "contractor",
+            "TypeId": 1648
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-09T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29153,
+          "Type": "job",
+          "Reference": "2741-14059",
+          "TotalHours": 10.75,
+          "Staff": {
+            "ID": 1646,
+            "Name": "BuildUno Pty Ltd",
+            "Type": "contractor",
+            "TypeId": 1646
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 10.75,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "17:45",
+              "ISO8601EndTime": "2025-12-09T17:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2632",
+      "name": "Lot 2, 9A Belmont Road West, Croydon South",
+      "client": "SDA MANAGED INVESTMENTS PTY LTD ",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29876,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1839,
+            "Name": "Christian Russo",
+            "Type": "employee",
+            "TypeId": 1839
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-10T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29877,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1853,
+            "Name": "Daniel Strong",
+            "Type": "employee",
+            "TypeId": 1853
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-10T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29878,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1850,
+            "Name": "Dhimitrios Qazimllari",
+            "Type": "employee",
+            "TypeId": 1850
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-10T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29879,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1845,
+            "Name": "Talau Latu",
+            "Type": "employee",
+            "TypeId": 1845
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-10T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29750,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1845,
+            "Name": "Talau Latu",
+            "Type": "employee",
+            "TypeId": 1845
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-09T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29749,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1850,
+            "Name": "Dhimitrios Qazimllari",
+            "Type": "employee",
+            "TypeId": 1850
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-09T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29747,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1839,
+            "Name": "Christian Russo",
+            "Type": "employee",
+            "TypeId": 1839
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-09T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29748,
+          "Type": "job",
+          "Reference": "2632-4811",
+          "TotalHours": 8,
+          "Staff": {
+            "ID": 1853,
+            "Name": "Daniel Strong",
+            "Type": "employee",
+            "TypeId": 1853
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 8,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "15:00",
+              "ISO8601EndTime": "2025-12-09T15:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2415",
+      "name": "WILLAWONG DISTRIBUTION CENTRE",
+      "client": "Quad Sol",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29089,
+          "Type": "job",
+          "Reference": "2415-3198",
+          "TotalHours": 9.25,
+          "Staff": {
+            "ID": 1648,
+            "Name": "Hi Solar",
+            "Type": "contractor",
+            "TypeId": 1648
+          },
+          "Date": "2025-12-16",
+          "Blocks": [
+            {
+              "Hrs": 9.25,
+              "StartTime": "07:30",
+              "ISO8601StartTime": "2025-12-16T07:30:00+11:00",
+              "EndTime": "16:45",
+              "ISO8601EndTime": "2025-12-16T16:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29088,
+          "Type": "job",
+          "Reference": "2415-3198",
+          "TotalHours": 9.25,
+          "Staff": {
+            "ID": 1762,
+            "Name": "Bob Riazati",
+            "Type": "employee",
+            "TypeId": 1762
+          },
+          "Date": "2025-12-16",
+          "Blocks": [
+            {
+              "Hrs": 9.25,
+              "StartTime": "07:30",
+              "ISO8601StartTime": "2025-12-16T07:30:00+11:00",
+              "EndTime": "16:45",
+              "ISO8601EndTime": "2025-12-16T16:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29086,
+          "Type": "job",
+          "Reference": "2415-3198",
+          "TotalHours": 9.25,
+          "Staff": {
+            "ID": 1762,
+            "Name": "Bob Riazati",
+            "Type": "employee",
+            "TypeId": 1762
+          },
+          "Date": "2025-12-15",
+          "Blocks": [
+            {
+              "Hrs": 9.25,
+              "StartTime": "07:30",
+              "ISO8601StartTime": "2025-12-15T07:30:00+11:00",
+              "EndTime": "16:45",
+              "ISO8601EndTime": "2025-12-15T16:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29087,
+          "Type": "job",
+          "Reference": "2415-3198",
+          "TotalHours": 9.25,
+          "Staff": {
+            "ID": 1648,
+            "Name": "Hi Solar",
+            "Type": "contractor",
+            "TypeId": 1648
+          },
+          "Date": "2025-12-15",
+          "Blocks": [
+            {
+              "Hrs": 9.25,
+              "StartTime": "07:30",
+              "ISO8601StartTime": "2025-12-15T07:30:00+11:00",
+              "EndTime": "16:45",
+              "ISO8601EndTime": "2025-12-15T16:45:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29084,
+          "Type": "job",
+          "Reference": "2415-3198",
+          "TotalHours": 5,
+          "Staff": {
+            "ID": 1855,
+            "Name": "Boardroom - Avengers",
+            "Type": "employee",
+            "TypeId": 1855
+          },
+          "Date": "2025-12-14",
+          "Blocks": [
+            {
+              "Hrs": 5,
+              "StartTime": "14:00",
+              "ISO8601StartTime": "2025-12-14T14:00:00+11:00",
+              "EndTime": "19:00",
+              "ISO8601EndTime": "2025-12-14T19:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29085,
+          "Type": "job",
+          "Reference": "2415-3198",
+          "TotalHours": 5,
+          "Staff": {
+            "ID": 1648,
+            "Name": "Hi Solar",
+            "Type": "contractor",
+            "TypeId": 1648
+          },
+          "Date": "2025-12-14",
+          "Blocks": [
+            {
+              "Hrs": 5,
+              "StartTime": "14:00",
+              "ISO8601StartTime": "2025-12-14T14:00:00+11:00",
+              "EndTime": "19:00",
+              "ISO8601EndTime": "2025-12-14T19:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2629",
+      "name": "Lot 1, 40 Liverpool Rd, Kilsyth",
+      "client": "SDA PARTNERSHIP HOLDINGS NO",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29648,
+          "Type": "job",
+          "Reference": "2629-4641",
+          "TotalHours": 8.5,
+          "Staff": {
+            "ID": 1852,
+            "Name": "Beau Gray",
+            "Type": "employee",
+            "TypeId": 1852
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 8.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "15:30",
+              "ISO8601EndTime": "2025-12-10T15:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29651,
+          "Type": "job",
+          "Reference": "2629-4641",
+          "TotalHours": 8.5,
+          "Staff": {
+            "ID": 1856,
+            "Name": "Daniel Hendricks",
+            "Type": "employee",
+            "TypeId": 1856
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 8.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "15:30",
+              "ISO8601EndTime": "2025-12-10T15:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29650,
+          "Type": "job",
+          "Reference": "2629-4641",
+          "TotalHours": 8.5,
+          "Staff": {
+            "ID": 1856,
+            "Name": "Daniel Hendricks",
+            "Type": "employee",
+            "TypeId": 1856
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 8.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "15:30",
+              "ISO8601EndTime": "2025-12-09T15:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29647,
+          "Type": "job",
+          "Reference": "2629-4641",
+          "TotalHours": 8.5,
+          "Staff": {
+            "ID": 1852,
+            "Name": "Beau Gray",
+            "Type": "employee",
+            "TypeId": 1852
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 8.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "15:30",
+              "ISO8601EndTime": "2025-12-09T15:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2630",
+      "name": "Lot 1, 83 Gordon St, Traralgon",
+      "client": "SDA PARTNERSHIP HOLDINGS NO",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29562,
+          "Type": "job",
+          "Reference": "2630-4687",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1475,
+            "Name": "Joel Aguirre",
+            "Type": "employee",
+            "TypeId": 1475
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "11:30",
+              "ISO8601StartTime": "2025-12-10T11:30:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-10T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29561,
+          "Type": "job",
+          "Reference": "2630-4687",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1857,
+            "Name": "Efren jr Mamaril",
+            "Type": "employee",
+            "TypeId": 1857
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "11:30",
+              "ISO8601StartTime": "2025-12-10T11:30:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-10T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29846,
+          "Type": "job",
+          "Reference": "2630-4694",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1858,
+            "Name": "James Latham",
+            "Type": "employee",
+            "TypeId": 1858
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "11:30",
+              "ISO8601StartTime": "2025-12-09T11:30:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-09T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2636",
+      "name": "Lot 141 81 Gordon Street, Traralgon",
+      "client": "SDA PARTNERSHIP HOLDINGS NO",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29560,
+          "Type": "job",
+          "Reference": "2636-5017",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1475,
+            "Name": "Joel Aguirre",
+            "Type": "employee",
+            "TypeId": 1475
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "11:30",
+              "ISO8601EndTime": "2025-12-10T11:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29559,
+          "Type": "job",
+          "Reference": "2636-5017",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1857,
+            "Name": "Efren jr Mamaril",
+            "Type": "employee",
+            "TypeId": 1857
+          },
+          "Date": "2025-12-10",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-10T07:00:00+11:00",
+              "EndTime": "11:30",
+              "ISO8601EndTime": "2025-12-10T11:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29845,
+          "Type": "job",
+          "Reference": "2636-5024",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1858,
+            "Name": "James Latham",
+            "Type": "employee",
+            "TypeId": 1858
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "11:30",
+              "ISO8601EndTime": "2025-12-09T11:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2754",
+      "name": "20 Amherst Drive",
+      "client": "Quad Sol",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29555,
+          "Type": "job",
+          "Reference": "2754-14323",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1475,
+            "Name": "Joel Aguirre",
+            "Type": "employee",
+            "TypeId": 1475
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "11:30",
+              "ISO8601EndTime": "2025-12-09T11:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29554,
+          "Type": "job",
+          "Reference": "2754-14323",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1837,
+            "Name": "Erfan Kashiri",
+            "Type": "employee",
+            "TypeId": 1837
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "11:30",
+              "ISO8601EndTime": "2025-12-09T11:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29553,
+          "Type": "job",
+          "Reference": "2754-14323",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1857,
+            "Name": "Efren jr Mamaril",
+            "Type": "employee",
+            "TypeId": 1857
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "11:30",
+              "ISO8601EndTime": "2025-12-09T11:30:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2760",
+      "name": "42 Amherst Drive Truganina",
+      "client": "Quad Sol",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29558,
+          "Type": "job",
+          "Reference": "2760-14455",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1475,
+            "Name": "Joel Aguirre",
+            "Type": "employee",
+            "TypeId": 1475
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "11:30",
+              "ISO8601StartTime": "2025-12-09T11:30:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-09T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29557,
+          "Type": "job",
+          "Reference": "2760-14455",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1837,
+            "Name": "Erfan Kashiri",
+            "Type": "employee",
+            "TypeId": 1837
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "11:30",
+              "ISO8601StartTime": "2025-12-09T11:30:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-09T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        },
+        {
+          "ID": 29556,
+          "Type": "job",
+          "Reference": "2760-14455",
+          "TotalHours": 4.5,
+          "Staff": {
+            "ID": 1857,
+            "Name": "Efren jr Mamaril",
+            "Type": "employee",
+            "TypeId": 1857
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 4.5,
+              "StartTime": "11:30",
+              "ISO8601StartTime": "2025-12-09T11:30:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-09T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2521",
+      "name": "7 Springfield Rd, Boronia",
+      "client": "SDA PORTFOLIO PTY LTD",
+      "description": "",
+      "status": "ACTIVE",
+      "progress": 0,
+      "budget": 0,
+      "spent": 0,
+      "scheduledStart": null,
+      "scheduledEnd": null,
+      "tags": [],
+      "schedules": [
+        {
+          "ID": 29909,
+          "Type": "job",
+          "Reference": "2521-3599",
+          "TotalHours": 9,
+          "Staff": {
+            "ID": 1854,
+            "Name": "Abel Van Rinh",
+            "Type": "employee",
+            "TypeId": 1854
+          },
+          "Date": "2025-12-09",
+          "Blocks": [
+            {
+              "Hrs": 9,
+              "StartTime": "07:00",
+              "ISO8601StartTime": "2025-12-09T07:00:00+11:00",
+              "EndTime": "16:00",
+              "ISO8601EndTime": "2025-12-09T16:00:00+11:00",
+              "ScheduleRate": {
+                "ID": 7,
+                "Name": "Normal Time"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "logs": [
+    {
+      "id": "simpro-log-1",
+      "workerName": "John Smith",
+      "role": "Technician",
+      "projectId": "simpro-1",
+      "projectName": "SimPRO Project Alpha",
+      "scheduledStart": "2024-03-15T08:00:00.000Z",
+      "scheduledEnd": "2024-03-15T17:00:00.000Z",
+      "actualStart": "2024-03-15T08:15:00.000Z",
+      "actualEnd": "2024-03-15T17:30:00.000Z",
+      "status": "APPROVED"
+    },
+    {
+      "id": "simpro-log-2",
+      "workerName": "Sarah Johnson",
+      "role": "Engineer",
+      "projectId": "simpro-1",
+      "projectName": "SimPRO Project Alpha",
+      "scheduledStart": "2024-03-15T08:00:00.000Z",
+      "scheduledEnd": "2024-03-15T17:00:00.000Z",
+      "actualStart": "2024-03-15T08:00:00.000Z",
+      "actualEnd": null,
+      "status": "PENDING"
+    },
+    {
+      "id": "simpro-log-3",
+      "workerName": "Mike Davis",
+      "role": "Supervisor",
+      "projectId": "simpro-2",
+      "projectName": "SimPRO Project Beta",
+      "scheduledStart": "2024-03-15T07:30:00.000Z",
+      "scheduledEnd": "2024-03-15T16:30:00.000Z",
+      "actualStart": "2024-03-15T07:30:00.000Z",
+      "actualEnd": "2024-03-15T16:45:00.000Z",
+      "status": "APPROVED"
+    },
+    {
+      "id": "simpro-log-4",
+      "workerName": "Emily Wilson",
+      "role": "Technician",
+      "projectId": "simpro-3",
+      "projectName": "SimPRO Project Gamma",
+      "scheduledStart": "2024-03-15T09:00:00.000Z",
+      "scheduledEnd": "2024-03-15T18:00:00.000Z",
+      "actualStart": "2024-03-15T09:15:00.000Z",
+      "actualEnd": null,
+      "status": "PENDING"
+    },
+    {
+      "id": "simpro-log-5",
+      "workerName": "David Brown",
+      "role": "Operator",
+      "projectId": "simpro-5",
+      "projectName": "SimPRO Project Epsilon",
+      "scheduledStart": "2024-03-15T08:00:00.000Z",
+      "scheduledEnd": "2024-03-15T17:00:00.000Z",
+      "actualStart": "2024-03-15T08:00:00.000Z",
+      "actualEnd": "2024-03-15T17:00:00.000Z",
+      "status": "APPROVED"
+    }
+  ]
+}
