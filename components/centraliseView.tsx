@@ -119,14 +119,20 @@ const CentraliseView = () => {
           if (isNaN(jobDate.getTime())) return null;
           
           // Generate color based on job status
+          // Handle both nested (Status.Name) and flat (status) structures
+          const statusName = job.Status?.Name || job.status || 'unknown';
           const statusColors: Record<string, string> = {
             'scheduled': '#818cf8',
             'in_progress': '#fbbf24',
             'completed': '#34d399',
             'cancelled': '#ef4444',
-            'on_hold': '#9ca3af'
+            'on_hold': '#9ca3af',
+            'Onsite': '#fbbf24',
+            'Break': '#9ca3af',
+            'End Of Day': '#34d399',
+            'Completed': '#34d399'
           };
-          const color = statusColors[job.status] || '#67e8f9';
+          const color = statusColors[statusName] || '#67e8f9';
 
           return {
             id: job.id,

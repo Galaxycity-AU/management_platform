@@ -349,21 +349,10 @@ export const SimPROProjectDetail: React.FC<SimPROProjectDetailProps> = ({ projec
             {/* High Level Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
-                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Total Budget</span>
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Budget</span>
                     <div className="flex items-end justify-between mt-2">
-                        <span className="text-lg md:text-2xl font-bold text-gray-900">${project.budget.toLocaleString()}</span>
+                        <span className="text-lg md:text-2xl font-bold text-gray-900">${project.budget.toLocaleString()} / ${project.spent.toLocaleString()}</span>
                         <DollarSign className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
-                    </div>
-                </div>
-                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
-                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Actual Spent</span>
-                    <div className="flex items-end justify-between mt-2">
-                        <span className={`text-lg md:text-2xl font-bold ${(project.spent > project.budget) ? 'text-red-600' : 'text-gray-900'}`}>
-                            ${project.spent.toLocaleString()}
-                        </span>
-                        <span className={`text-[10px] md:text-xs font-medium px-1.5 py-0.5 rounded ${project.spent/project.budget > 0.9 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                            {((project.spent/project.budget)*100).toFixed(0)}%
-                        </span>
                     </div>
                 </div>
                 <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
@@ -374,9 +363,9 @@ export const SimPROProjectDetail: React.FC<SimPROProjectDetailProps> = ({ projec
                     </div>
                 </div>
                 <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
-                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Team Size</span>
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Project Manager</span>
                     <div className="flex items-end justify-between mt-2">
-                        <span className="text-lg md:text-2xl font-bold text-gray-900">{logs.length > 0 ? new Set(logs.map(l => l.workerName)).size : 0}</span>
+                        <span className="text-lg md:text-2xl font-bold text-gray-900">{project.projectManager}</span>
                         <User className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
                     </div>
                 </div>
@@ -391,12 +380,12 @@ export const SimPROProjectDetail: React.FC<SimPROProjectDetailProps> = ({ projec
                     >
                         Live Operations
                     </button>
-                    {/* <button 
+                    <button 
                         onClick={() => setActiveTab('FINANCE')}
                         className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'FINANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         Financial Overview
-                    </button> */}
+                    </button>
                     <button 
                         onClick={() => setActiveTab('INFO')}
                         className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'INFO' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
@@ -437,53 +426,141 @@ export const SimPROProjectDetail: React.FC<SimPROProjectDetailProps> = ({ projec
                                 <WorkerGanttChart logs={displayLogs} currentDate={currentDate} schedules={displaySchedules} />
                             </div>
 
-                            <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="w-5 h-5 text-indigo-600" />
-                                        <h4 className="font-semibold text-lg text-gray-800">Daily Notes</h4>
-                                        {noteLastUpdated[currentDateKey] && (
-                                            <span className="text-xs text-gray-500 ml-2">
-                                                Updated {noteLastUpdated[currentDateKey].toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
+
+                            
+                            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Daily Logs Section */}
+                                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-50 rounded-lg">
+                                                <Clock className="w-5 h-5 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-lg text-gray-800">Daily Logs</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    {displayLogs.length} log{displayLogs.length !== 1 ? 's' : ''} for {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                                        {displayLogs.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {displayLogs.map((log) => {
+                                                    const isLive = !log.actualEnd && isToday(currentDate);
+                                                    const statusColor = 
+                                                        isLive ? 'bg-green-100 text-green-700 border-green-200' :
+                                                        log.status === LogStatus.APPROVED ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                        log.status === LogStatus.REJECTED ? 'bg-red-100 text-red-700 border-red-200' :
+                                                        'bg-amber-100 text-amber-700 border-amber-200';
+                                                    
+                                                    return (
+                                                        <div key={log.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-xs font-bold text-indigo-700">
+                                                                            {log.workerName.charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-semibold text-gray-900">{log.workerName}</p>
+                                                                            <p className="text-xs text-gray-500">{log.role}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
+                                                                    {isLive ? 'Active' : 
+                                                                     log.status === LogStatus.APPROVED ? 'Approved' :
+                                                                     log.status === LogStatus.REJECTED ? 'Rejected' :
+                                                                     'Pending'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
+                                                                <div>
+                                                                    <span className="text-gray-500">Scheduled:</span>
+                                                                    <p className="text-gray-900 font-medium mt-0.5">
+                                                                        {formatTime(log.scheduledStart)} - {formatTime(log.scheduledEnd)}
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-gray-500">Actual:</span>
+                                                                    <p className="text-gray-900 font-medium mt-0.5">
+                                                                        {log.actualStart ? formatTime(log.actualStart) : '--'} - {log.actualEnd ? formatTime(log.actualEnd) : (isLive ? 'Ongoing' : '--')}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            {log.notes && (
+                                                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                                                    <p className="text-xs text-gray-600 italic">"{log.notes}"</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                                                <Clock className="w-10 h-10 mb-2 opacity-20" />
+                                                <p className="text-sm">No logs recorded for {currentDate.toLocaleDateString()}</p>
+                                            </div>
                                         )}
                                     </div>
-                                    {noteSaved && (
-                                        <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg">
-                                            <CheckCircle2 className="w-3 h-3" />
-                                            Saved
-                                        </div>
-                                    )}
                                 </div>
-                                <div className="space-y-3">
-                                    <textarea
-                                        value={currentNotes}
-                                        onChange={(e) => handleNotesChange(e.target.value)}
-                                        maxLength={500}
-                                        className="w-full min-h-[120px] p-4 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y text-sm text-gray-700 placeholder-gray-400"
-                                        placeholder="Add notes about today's operations, issues, achievements, or important updates..."
-                                    />
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-xs text-gray-500">
-                                            {currentNotes.length} / 500 characters
+
+                                {/* Daily Notes Section */}
+                                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-50 rounded-lg">
+                                                <FileText className="w-5 h-5 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-lg text-gray-800">Daily Notes</h4>
+                                                {noteLastUpdated[currentDateKey] && (
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        Updated {noteLastUpdated[currentDateKey].toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            {currentNotes.trim() && (
-                                                <button
-                                                    onClick={handleClearNotes}
-                                                    className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
-                                                >
-                                                    Clear
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={handleSaveNotes}
-                                                disabled={!currentNotes.trim()}
-                                                className="px-4 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                                            >
+                                        {noteSaved && (
+                                            <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg">
                                                 <CheckCircle2 className="w-3 h-3" />
-                                                Save Notes
-                                            </button>
+                                                Saved
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="space-y-3">
+                                        <textarea
+                                            value={currentNotes}
+                                            onChange={(e) => handleNotesChange(e.target.value)}
+                                            maxLength={500}
+                                            className="w-full min-h-[200px] p-4 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y text-sm text-gray-700 placeholder-gray-400"
+                                            placeholder="Add notes about today's operations, issues, achievements, or important updates..."
+                                        />
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-xs text-gray-500">
+                                                {currentNotes.length} / 500 characters
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {currentNotes.trim() && (
+                                                    <button
+                                                        onClick={handleClearNotes}
+                                                        className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={handleSaveNotes}
+                                                    disabled={!currentNotes.trim()}
+                                                    className="px-4 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                                >
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    Save Notes
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -538,31 +615,231 @@ export const SimPROProjectDetail: React.FC<SimPROProjectDetailProps> = ({ projec
 
                     {/* INFO TAB */}
                     {activeTab === 'INFO' && (
-                        <div className="animate-in fade-in duration-300 max-w-2xl">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4">Project Overview</h3>
-                            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</label>
-                                    <p className="text-gray-700 mt-2 leading-relaxed">{project.description}</p>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Start Date</label>
-                                        <p className="text-gray-900 mt-1 font-medium">{project.scheduledStart.toLocaleDateString()}</p>
+                        <div className="animate-in fade-in duration-300">
+                            <h3 className="text-lg font-bold text-gray-900 mb-6">Project Information</h3>
+                            <div className="space-y-6">
+                                {/* Basic Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Basic Information</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Project ID</label>
+                                            <p className="text-gray-900 mt-1 font-medium">{project.id}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Client</label>
+                                            <p className="text-gray-900 mt-1 font-medium">{project.client || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</label>
+                                            <p className="mt-1">
+                                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                                                    project.status === ProjectStatus.ACTIVE ? 'bg-blue-100 text-blue-700' :
+                                                    project.status === ProjectStatus.COMPLETED ? 'bg-green-100 text-green-700' :
+                                                    project.status === ProjectStatus.DELAYED ? 'bg-red-100 text-red-700' :
+                                                    project.status === ProjectStatus.ON_HOLD ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-gray-100 text-gray-700'
+                                                }`}>
+                                                    {project.status || 'Unknown'}
+                                                </span>
+                                            </p>
+                                        </div>
+                                        {(project as any).projectManager && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Project Manager</label>
+                                                <p className="text-gray-900 mt-1 font-medium">{(project as any).projectManager}</p>
+                                            </div>
+                                        )}
+                                        {(project as any).stage && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Stage</label>
+                                                <p className="text-gray-900 mt-1 font-medium">{(project as any).stage}</p>
+                                            </div>
+                                        )}
+                                        {project.progress !== undefined && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Progress</label>
+                                                <div className="mt-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                            <div 
+                                                                className="bg-indigo-600 h-2 rounded-full transition-all"
+                                                                style={{ width: `${project.progress}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <span className="text-sm font-medium text-gray-900">{project.progress}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Projected End</label>
-                                        <p className="text-gray-900 mt-1 font-medium">{project.scheduledEnd.toLocaleDateString()}</p>
+                                    {project.description && (
+                                        <div className="mt-6">
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</label>
+                                            <p className="text-gray-700 mt-2 leading-relaxed">{project.description}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Timeline Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Timeline</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {project.scheduledStart ? (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled Start</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.scheduledStart.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled Start</label>
+                                                <p className="text-gray-500 mt-1 font-medium italic">Not scheduled</p>
+                                            </div>
+                                        )}
+                                        {project.scheduledEnd ? (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled End</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.scheduledEnd.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled End</label>
+                                                <p className="text-gray-500 mt-1 font-medium italic">Not scheduled</p>
+                                            </div>
+                                        )}
+                                        {project.actualStart && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Actual Start</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.actualStart.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {project.actualEnd && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Actual End</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.actualEnd.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {project.scheduledStart && project.scheduledEnd && (
+                                        <div className="mt-6">
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Duration</label>
+                                            <p className="text-gray-900 mt-1 font-medium">
+                                                {Math.ceil((project.scheduledEnd.getTime() - project.scheduledStart.getTime()) / (1000 * 60 * 60 * 24))} days
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Financial Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Financial Overview</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Budget</label>
+                                            <p className="text-gray-900 mt-1 font-medium text-lg">${project.budget.toLocaleString()} / ${project.spent.toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Remaining Budget</label>
+                                            <p className={`mt-1 font-medium text-lg ${(project.budget - project.spent) < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                                ${(project.budget - project.spent).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Budget Utilization</label>
+                                            <div className="mt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                        <div 
+                                                            className={`h-2 rounded-full transition-all ${
+                                                                (project.spent / project.budget) > 1 ? 'bg-red-500' :
+                                                                (project.spent / project.budget) > 0.9 ? 'bg-yellow-500' :
+                                                                'bg-green-500'
+                                                            }`}
+                                                            style={{ width: `${Math.min(100, (project.spent / project.budget) * 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className={`text-sm font-medium ${
+                                                        (project.spent / project.budget) > 1 ? 'text-red-600' :
+                                                        (project.spent / project.budget) > 0.9 ? 'text-yellow-600' :
+                                                        'text-green-600'
+                                                    }`}>
+                                                        {((project.spent / project.budget) * 100).toFixed(1)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
-                                    <div className="flex gap-2 mt-2 flex-wrap">
-                                        {project.tags.map(tag => (
-                                            <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-                                                {tag}
-                                            </span>
-                                        ))}
+
+                                {/* Additional Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Additional Information</h4>
+                                    <div className="space-y-6">
+                                        {project.tags && project.tags.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
+                                                <div className="flex gap-2 mt-2 flex-wrap">
+                                                    {project.tags.map(tag => (
+                                                        <span key={tag} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium border border-indigo-100">
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {project.schedules && project.schedules.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Schedules</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.schedules.length} schedule{project.schedules.length !== 1 ? 's' : ''} recorded
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Total hours: {project.schedules.reduce((sum, s) => sum + (s.TotalHours || 0), 0).toFixed(1)}h
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    Unique staff: {new Set(project.schedules.map(s => s.Staff?.ID).filter(Boolean)).size} member{new Set(project.schedules.map(s => s.Staff?.ID).filter(Boolean)).size !== 1 ? 's' : ''}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {logs && logs.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Team Members</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {new Set(logs.map(l => l.workerName)).size} team member{new Set(logs.map(l => l.workerName)).size !== 1 ? 's' : ''}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Total work logs: {logs.length}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

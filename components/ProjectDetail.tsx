@@ -629,31 +629,204 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
 
                     {/* INFO TAB */}
                     {activeTab === 'INFO' && (
-                        <div className="animate-in fade-in duration-300 max-w-2xl">
-                            <h3 className="text-lg font-bold text-gray-900 mb-4">Project Overview</h3>
-                            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</label>
-                                    <p className="text-gray-700 mt-2 leading-relaxed">{project.description}</p>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Start Date</label>
-                                        <p className="text-gray-900 mt-1 font-medium">{project.scheduledStart.toLocaleDateString()}</p>
+                        <div className="animate-in fade-in duration-300">
+                            <h3 className="text-lg font-bold text-gray-900 mb-6">Project Information</h3>
+                            <div className="space-y-6">
+                                {/* Basic Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Basic Information</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Project ID</label>
+                                            <p className="text-gray-900 mt-1 font-medium">{project.id}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Client</label>
+                                            <p className="text-gray-900 mt-1 font-medium">{project.client}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</label>
+                                            <p className="mt-1">
+                                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                                                    project.status === ProjectStatus.ACTIVE ? 'bg-blue-100 text-blue-700' :
+                                                    project.status === ProjectStatus.COMPLETED ? 'bg-green-100 text-green-700' :
+                                                    project.status === ProjectStatus.DELAYED ? 'bg-red-100 text-red-700' :
+                                                    project.status === ProjectStatus.ON_HOLD ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-gray-100 text-gray-700'
+                                                }`}>
+                                                    {project.status}
+                                                </span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Progress</label>
+                                            <div className="mt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                        <div 
+                                                            className="bg-indigo-600 h-2 rounded-full transition-all"
+                                                            style={{ width: `${project.progress}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className="text-sm font-medium text-gray-900">{project.progress}%</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Projected End</label>
-                                        <p className="text-gray-900 mt-1 font-medium">{project.scheduledEnd.toLocaleDateString()}</p>
+                                    <div className="mt-6">
+                                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</label>
+                                        <p className="text-gray-700 mt-2 leading-relaxed">{project.description || 'No description provided'}</p>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
-                                    <div className="flex gap-2 mt-2 flex-wrap">
-                                        {project.tags?.map(tag => (
-                                            <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-                                                {tag}
-                                            </span>
-                                        ))}
+
+                                {/* Timeline Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Timeline</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled Start</label>
+                                            <p className="text-gray-900 mt-1 font-medium">
+                                                {project.scheduledStart.toLocaleDateString('en-US', { 
+                                                    weekday: 'short', 
+                                                    year: 'numeric', 
+                                                    month: 'short', 
+                                                    day: 'numeric' 
+                                                })}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled End</label>
+                                            <p className="text-gray-900 mt-1 font-medium">
+                                                {project.scheduledEnd.toLocaleDateString('en-US', { 
+                                                    weekday: 'short', 
+                                                    year: 'numeric', 
+                                                    month: 'short', 
+                                                    day: 'numeric' 
+                                                })}
+                                            </p>
+                                        </div>
+                                        {project.actualStart && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Actual Start</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.actualStart.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {project.actualEnd && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Actual End</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.actualEnd.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {project.scheduledStart && project.scheduledEnd && (
+                                        <div className="mt-6">
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Duration</label>
+                                            <p className="text-gray-900 mt-1 font-medium">
+                                                {Math.ceil((project.scheduledEnd.getTime() - project.scheduledStart.getTime()) / (1000 * 60 * 60 * 24))} days
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Financial Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Financial Overview</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Total Budget</label>
+                                            <p className="text-gray-900 mt-1 font-medium text-lg">${project.budget.toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Amount Spent</label>
+                                            <p className={`mt-1 font-medium text-lg ${project.spent > project.budget ? 'text-red-600' : 'text-gray-900'}`}>
+                                                ${project.spent.toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Remaining Budget</label>
+                                            <p className={`mt-1 font-medium text-lg ${(project.budget - project.spent) < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                                ${(project.budget - project.spent).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Budget Utilization</label>
+                                            <div className="mt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                        <div 
+                                                            className={`h-2 rounded-full transition-all ${
+                                                                (project.spent / project.budget) > 1 ? 'bg-red-500' :
+                                                                (project.spent / project.budget) > 0.9 ? 'bg-yellow-500' :
+                                                                'bg-green-500'
+                                                            }`}
+                                                            style={{ width: `${Math.min(100, (project.spent / project.budget) * 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className={`text-sm font-medium ${
+                                                        (project.spent / project.budget) > 1 ? 'text-red-600' :
+                                                        (project.spent / project.budget) > 0.9 ? 'text-yellow-600' :
+                                                        'text-green-600'
+                                                    }`}>
+                                                        {((project.spent / project.budget) * 100).toFixed(1)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Additional Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Additional Information</h4>
+                                    <div className="space-y-6">
+                                        {project.tags && project.tags.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
+                                                <div className="flex gap-2 mt-2 flex-wrap">
+                                                    {project.tags.map(tag => (
+                                                        <span key={tag} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium border border-indigo-100">
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {project.schedules && project.schedules.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Schedules</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.schedules.length} schedule{project.schedules.length !== 1 ? 's' : ''} recorded
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Total hours: {project.schedules.reduce((sum, s) => sum + (s.TotalHours || 0), 0).toFixed(1)}h
+                                                </p>
+                                            </div>
+                                        )}
+                                        {logs && logs.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Team Members</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {new Set(logs.map(l => l.workerName)).size} team member{new Set(logs.map(l => l.workerName)).size !== 1 ? 's' : ''}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Total work logs: {logs.length}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

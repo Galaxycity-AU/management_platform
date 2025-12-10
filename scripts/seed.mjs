@@ -1,4 +1,4 @@
-import db from "../models/database.js";
+import db from "../database/database.js";
 
 // Helpers
 function randInt(min, max) {

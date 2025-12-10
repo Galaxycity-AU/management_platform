@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { filterToGet7DaysSchedule, prepareScheduleTableData, prepareLogTableData, groupScheduleByJobId } from '../services/dataPreparation.js';
-import { processLogsByProject } from '../services/eventTracking.js';
+import { filterToGet7DaysSchedule, prepareScheduleTableData, prepareLogTableData, groupScheduleByJobId } from '../simpro/dataPreparation.js';
+import { processLogsByProject } from '../simpro/eventTracking.js';
 import { EventTrackingView } from './EventTrackingView';
 import { callAPI, debugLog, getStoredLogs, saveLogs, getLastProcessedId, saveLastProcessedId } from '../utils';
 import { truncateClientName } from '../utils/stringUtils';
@@ -118,12 +118,13 @@ const App: React.FC = () => {
               id: String(jobData.ID),
               name: jobData.Site?.Name || '',
               client: truncateClientName(jobData.Customer?.CompanyName || ''),
-              description: jobData.Description, // placeholder for remaining
-              status: 'ACTIVE', // placeholder for remaining
+              // description: jobData.Description, // placeholder for remaining
+              status: jobData.Status?.Name || 'unknown', // placeholder for remaining
             //   progress: 0, // placeholder for remaining
-              budget: jobData.Adjusted.Estimate, // placeholder for remaining
-              spent: jobData.Adjusted.Actual, // placeholder for remaining\
+              budget: jobData.Totals?.Adjusted?.Estimate || jobData.Total?.Estimate || 0, // placeholder for remaining
+              spent: jobData.Totals?.Adjusted?.Actual || jobData.Total?.Actual || 0, // placeholder for remaining
               projectManager: jobData.ProjectManager?.Name || '',
+              stage: jobData.Stage || '',
               scheduledStart: null, // placeholder for remaining
               scheduledEnd: null, // placeholder for remaining
               tags: [], // placeholder for remaining

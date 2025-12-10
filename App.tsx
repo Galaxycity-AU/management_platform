@@ -47,7 +47,7 @@ function App() {
   // Load SimPRO data from JSON file (no database connection - pure JSON array)
   const loadSimPROData = async () => {
     try {
-      const response = await fetch('data/simproProjects.json');
+      const response = await fetch('http://localhost:3001/api/simpro/projects');
       const data = await response.json();
 
       // Convert date strings to Date objects for projects
