@@ -8,9 +8,11 @@ export enum ProjectStatus {
 }
 
 export enum LogStatus {
-  PENDING = 'pending',
+  SCHEDULE = 'schedule',
+  ACTIVE = 'active',
   APPROVED = 'approved',
-  REJECTED = 'rejected'
+  REJECTED = 'rejected',
+  WAITING_APPROVAL = 'waiting_approval'
 }
 
 export interface WorkerLog {

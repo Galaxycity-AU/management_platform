@@ -25,7 +25,6 @@ async function main() {
     console.log("Clearing existing data...");
     await db.query("SET FOREIGN_KEY_CHECKS = 0");
     await db.query("TRUNCATE TABLE approvals");
-    await db.query("TRUNCATE TABLE job_workers");
     await db.query("TRUNCATE TABLE jobs");
     await db.query("TRUNCATE TABLE projects");
     await db.query("TRUNCATE TABLE workers");
@@ -117,7 +116,7 @@ async function main() {
       "Flooring Installation", "Window Installation", "Door Installation", "Demolition Work"
     ];
 
-    const jobStatuses = ["scheduled", "in_progress", "completed", "cancelled", "on_hold"];
+    const jobStatuses = ["schedule", "active", "approved", "rejected", "waiting_approval"];
     const jobs = [];
 
     console.log("Creating jobs...");
@@ -133,16 +132,22 @@ async function main() {
       // Generate scheduled end date/time (4-8 hours after start)
       const scheduledEnd = new Date(scheduledStart.getTime() + randInt(4, 8) * 3600000);
 
-      // For completed or in_progress jobs, generate actual times
+      // Generate actual times based on status
       let actualStart = null;
       let actualEnd = null;
-      if (status === 'completed' || status === 'in_progress') {
-        // Actual start might be slightly earlier/later than scheduled (-30 to +60 minutes)
+
+      if (status === 'schedule') {
+        // SCHEDULE: Only schedule start and end time, no actual times
+        actualStart = null;
+        actualEnd = null;
+      } else if (status === 'active') {
+        // ACTIVE: Schedule start and end time, actual start but no end
         actualStart = new Date(scheduledStart.getTime() + randInt(-30, 60) * 60000);
-        if (status === 'completed') {
-          // Actual end might differ from scheduled (-60 to +120 minutes)
-          actualEnd = new Date(scheduledEnd.getTime() + randInt(-60, 120) * 60000);
-        }
+        actualEnd = null;
+      } else if (status === 'approved' || status === 'rejected' || status === 'waiting_approval') {
+        // APPROVED/REJECTED/WAITING_APPROVAL: All schedule and actual times
+        actualStart = new Date(scheduledStart.getTime() + randInt(-30, 60) * 60000);
+        actualEnd = new Date(scheduledEnd.getTime() + randInt(-60, 120) * 60000);
       }
 
       // Sometimes jobs get rescheduled (20% chance)
