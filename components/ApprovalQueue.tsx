@@ -289,8 +289,8 @@ const HistoryLogCard: React.FC<{ log: WorkerLog }> = ({ log }) => {
 export const ApprovalQueue: React.FC<ApprovalQueueProps> = ({ logs, onApprove, onReject }) => {
   const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING');
 
-  const pendingLogs = useMemo(() => logs.filter(l => l.status === LogStatus.PENDING), [logs]);
-  const historyLogs = useMemo(() => logs.filter(l => l.status !== LogStatus.PENDING).sort((a,b) => (b.actualEnd?.getTime() || 0) - (a.actualEnd?.getTime() || 0)), [logs]);
+  const pendingLogs = useMemo(() => logs.filter(l => l.status === LogStatus.WAITING_APPROVAL), [logs]);
+  const historyLogs = useMemo(() => logs.filter(l => l.status !== LogStatus.WAITING_APPROVAL).sort((a,b) => (b.actualEnd?.getTime() || 0) - (a.actualEnd?.getTime() || 0)), [logs]);
 
   // Group pending only
   const groupedPending = useMemo(() => {

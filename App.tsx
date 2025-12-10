@@ -155,10 +155,13 @@ function App() {
               const actualStart = job.actual_start ? new Date(job.actual_start) : null;
               const actualEnd = job.actual_end ? new Date(job.actual_end) : null;
               
-              // Determine status based on job status
-              const logStatus = job.status === 'completed' ? LogStatus.APPROVED :
-                               job.status === 'cancelled' ? LogStatus.REJECTED :
-                               LogStatus.PENDING;
+              // Map job status to LogStatus
+              const logStatus = job.status === 'schedule' ? LogStatus.SCHEDULE :
+                               job.status === 'active' ? LogStatus.ACTIVE :
+                               job.status === 'approved' ? LogStatus.APPROVED :
+                               job.status === 'rejected' ? LogStatus.REJECTED :
+                               job.status === 'waiting_approval' ? LogStatus.WAITING_APPROVAL :
+                               LogStatus.SCHEDULE;
               
               return {
                 id: String(job.id),
@@ -184,10 +187,10 @@ function App() {
           console.log('Sample log:', logsData[0]);
           setLogs(logsData);
           
-          // Calculate progress for each project based on completed jobs
+          // Calculate progress for each project based on approved jobs
           const updatedProjects = projectData.map(project => {
             const projectJobs = jobsData.filter((job: any) => job.project_id === project.id);
-            const completedJobs = projectJobs.filter((job: any) => job.status === 'completed').length;
+            const completedJobs = projectJobs.filter((job: any) => job.status === 'approved').length;
             const progress = projectJobs.length > 0 ? (completedJobs / projectJobs.length) * 100 : 0;
             
             return {
@@ -221,7 +224,7 @@ function App() {
     totalProjects: projects.length,
     activeProjects: projects.filter(p => p.status === ProjectStatus.ACTIVE).length,
     delayedProjects: projects.filter(p => p.status === ProjectStatus.DELAYED).length,
-    pendingApprovals: logs.filter(l => l.status === LogStatus.PENDING).length,
+    pendingApprovals: logs.filter(l => l.status === LogStatus.WAITING_APPROVAL).length,
   };
 
   const projectStatusData = [
