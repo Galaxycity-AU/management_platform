@@ -1,105 +1,91 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu } from 'lucide-react';
+import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu, Code, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Project, WorkerLog, LogStatus, ProjectStatus } from './types';
 import { analyzeProjectHealth } from './services/geminiService';
 import { ProjectTable } from './components/ProjectTable';
 import { ProjectDetail } from './components/ProjectDetail';
+import { SimPROProjectTable } from './components/SimPROProjectTable';
+import { SimPROProjectDetail } from './components/SimPROProjectDetail';
 import { ApprovalQueue } from './components/ApprovalQueue';
 import { DashboardStatsView } from './components/DashboardStats';
+import API_Testing from './components/API_Testing';
+import { truncateClientName } from './utils/stringUtils';
 
 enum View {
   DASHBOARD = 'dashboard',
   PROJECTS = 'projects',
+  SIMPRO_PROJECTS = 'simpro-projects',
   APPROVALS = 'approvals',
+  API_TESTING = 'api-testing',
 }
 
 function App() {
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
   const [projects, setProjects] = useState<Project[]>([]);
   const [logs, setLogs] = useState<WorkerLog[]>([]);
+  const [simproProjects, setSimproProjects] = useState<Project[]>([]);
+  const [simproLogs, setSimproLogs] = useState<WorkerLog[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedSimPROProject, setSelectedSimPROProject] = useState<Project | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [aiAnalysisResult, setAiAnalysisResult] = useState<{ id: string, text: string } | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  
+  // Sidebar collapse state with localStorage persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+  
+  const toggleSidebar = () => {
+    const newState = !isSidebarCollapsed;
+    setIsSidebarCollapsed(newState);
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
+  };
+
+  // Load SimPRO data from JSON file (no database connection - pure JSON array)
+  const loadSimPROData = async () => {
+    try {
+      const response = await fetch('data/simproProjects.json');
+      const data = await response.json();
+      
+      // Convert date strings to Date objects for projects
+      const projectsWithDates: Project[] = data.projects.map((p: any) => ({
+        ...p,
+        client: truncateClientName(p.client || ''),
+        scheduledStart: p.scheduledStart ? new Date(p.scheduledStart) : new Date(),
+        scheduledEnd: p.scheduledEnd ? new Date(p.scheduledEnd) : new Date(),
+        status: p.status as ProjectStatus,
+        schedules: p.schedules || [], // Include schedules array
+      }));
+      
+      // Convert date strings to Date objects for logs
+      const logsWithDates: WorkerLog[] = data.logs.map((l: any) => ({
+        ...l,
+        scheduledStart: new Date(l.scheduledStart),
+        scheduledEnd: new Date(l.scheduledEnd),
+        actualStart: l.actualStart ? new Date(l.actualStart) : null,
+        actualEnd: l.actualEnd ? new Date(l.actualEnd) : null,
+        status: l.status as LogStatus,
+      }));
+      
+      setSimproProjects(projectsWithDates);
+      setSimproLogs(logsWithDates);
+    } catch (error) {
+      console.error('Error loading SimPRO data:', error);
+      // Fallback to empty arrays if JSON file fails to load
+      setSimproProjects([]);
+      setSimproLogs([]);
+    }
+  };
 
   // Fetch real data from backend API
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Fetch from backend API using CRUD functions
-        const [apiProjects, apiJobs, apiWorkers, apiApprovals] = await Promise.all([
-          fetch('/api/projects').then(res => res.json()),
-          fetch('/api/jobs').then(res => res.json()),
-          fetch('/api/workers').then(res => res.json()),
-          fetch('/api/approvals').then(res => res.json()),
-        ]);
-        
-        // Transform API data to Project[] type
-        const transformedProjects: Project[] = apiProjects.map((p: any, idx: number) => ({
-          id: `proj-${p.id}`,
-          name: p.title,
-          client: p.description || 'Unknown Client',
-          description: p.description || '',
-          status: p.status === 'active' ? ProjectStatus.ACTIVE : 
-                  p.status === 'completed' ? ProjectStatus.COMPLETED : 
-                  p.status === 'paused' ? ProjectStatus.DELAYED : ProjectStatus.PLANNING,
-          scheduledStart: new Date(p.createdAt),
-          scheduledEnd: new Date(p.deadline),
-          actualStart: new Date(p.createdAt),
-          progress: p.progress || 0,
-          budget: p.budget || 0,
-          spent: p.expenses || 0,
-          tags: [p.status]
-        }));
-
-        // Transform API data to WorkerLog[] type
-        const transformedLogs: WorkerLog[] = apiJobs.map((job: any) => {
-          const worker = apiWorkers.find((w: any) => w.id === job.workerId);
-          const approval = apiApprovals.find((a: any) => a.jobId === job.id);
-          const project = transformedProjects.find(p => p.id === `proj-${job.projectId}`);
-          
-          const scheduledStart = new Date(job.jobDate);
-          const [startHour, startMin] = job.startTime.split(':').map(Number);
-          const [endHour, endMin] = job.endTime.split(':').map(Number);
-          scheduledStart.setHours(startHour, startMin, 0, 0);
-          
-          const scheduledEnd = new Date(job.jobDate);
-          scheduledEnd.setHours(endHour, endMin, 0, 0);
-
-          return {
-            id: `log-${job.id}`,
-            projectId: `proj-${job.projectId}`,
-            projectName: project?.name || 'Unknown',
-            workerName: worker?.name || 'Unknown Worker',
-            role: worker?.position || 'Unknown Role',
-            scheduledStart,
-            scheduledEnd,
-            actualStart: job.clockedInTime ? new Date(`${job.jobDate}T${job.clockedInTime}`) : scheduledStart,
-            actualEnd: job.clockedOutTime ? new Date(`${job.jobDate}T${job.clockedOutTime}`) : null,
-            originalActualStart: job.editedInTime ? new Date(`${job.jobDate}T${job.editedInTime}`) : null,
-            originalActualEnd: job.editedOutTime ? new Date(`${job.jobDate}T${job.editedOutTime}`) : null,
-            status: approval?.status === 'approved' ? LogStatus.APPROVED : 
-                    approval?.status === 'rejected' ? LogStatus.REJECTED : LogStatus.PENDING,
-            notes: job.status || '',
-            approvedBy: approval ? 'Manager' : undefined,
-            approvedAt: approval ? new Date(approval.approvalDate) : undefined,
-            adjustmentReason: approval?.comments || undefined
-          };
-        });
-
-        setProjects(transformedProjects);
-        setLogs(transformedLogs);
-      } catch (err) {
-        console.error('Failed to fetch data from API:', err);
-        // Fallback to empty state if API fails
-        setProjects([]);
-        setLogs([]);
-      }
-    };
-
-    fetchData();
+    const { projects: initialProjects, logs: initialLogs } = generateMockData();
+    setProjects(initialProjects);
+    setLogs(initialLogs);
   }, []);
 
   // Stats Calculation
@@ -154,60 +140,118 @@ function App() {
     setCurrentView(View.PROJECTS);
   };
 
+  const handleSelectSimPROProject = (project: Project) => {
+    setSelectedSimPROProject(project);
+    setCurrentView(View.SIMPRO_PROJECTS);
+  };
+
   const handleBackToTable = () => {
       setSelectedProject(null);
+  };
+
+  const handleBackToSimPROTable = () => {
+      setSelectedSimPROProject(null);
   };
 
   // Switch views resets selection
   const handleSwitchView = (view: View) => {
       setCurrentView(view);
       setSelectedProject(null);
+      setSelectedSimPROProject(null);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row h-screen overflow-hidden">
       
       {/* Sidebar (Desktop only - LG breakpoint) */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-shrink-0 flex-col z-20">
-        <div className="p-6 border-b border-gray-100">
-          <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
-            <LayoutDashboard className="w-6 h-6" />
-            ProjectFlow
-          </h1>
+      <aside className={`hidden lg:flex ${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex-shrink-0 flex-col z-20 transition-all duration-300`}>
+        <div className={`p-6 border-b border-gray-100 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+          {!isSidebarCollapsed && (
+            <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
+              <LayoutDashboard className="w-6 h-6" />
+              ProjectFlow
+            </h1>
+          )}
+          {isSidebarCollapsed && (
+            <LayoutDashboard className="w-6 h-6 text-indigo-600" />
+          )}
+          <button
+            onClick={toggleSidebar}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700"
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
         </div>
-        <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
+        <nav className={`p-4 space-y-1 flex-1 overflow-y-auto ${isSidebarCollapsed ? 'items-center' : ''}`}>
           <button 
             onClick={() => handleSwitchView(View.DASHBOARD)}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.DASHBOARD ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.DASHBOARD ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+            title={isSidebarCollapsed ? 'Dashboard' : undefined}
           >
-            <LayoutDashboard className="w-5 h-5" />
-            Dashboard
+            <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && <span>Dashboard</span>}
           </button>
           <button 
              onClick={() => handleSwitchView(View.PROJECTS)}
-             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? `Projects (${projects.length})` : undefined}
           >
-            <ListTodo className="w-5 h-5" />
-            Projects ({projects.length})
+            <ListTodo className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && (
+              <>
+                <span>Projects ({projects.length})</span>
+              </>
+            )}
+          </button>
+          <button 
+             onClick={() => handleSwitchView(View.SIMPRO_PROJECTS)}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.SIMPRO_PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? `SimPRO Projects (${simproProjects.length})` : undefined}
+          >
+            <ListTodo className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && (
+              <>
+                <span>SimPRO Projects ({simproProjects.length})</span>
+              </>
+            )}
           </button>
           <button 
              onClick={() => handleSwitchView(View.APPROVALS)}
-             className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.APPROVALS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors relative ${currentView === View.APPROVALS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? `Approvals${stats.pendingApprovals > 0 ? ` (${stats.pendingApprovals})` : ''}` : undefined}
           >
-            <ClipboardCheck className="w-5 h-5" />
-            Approvals
-            {stats.pendingApprovals > 0 && (
-              <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{stats.pendingApprovals}</span>
+            <ClipboardCheck className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && (
+              <>
+                <span>Approvals</span>
+                {stats.pendingApprovals > 0 && (
+                  <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{stats.pendingApprovals}</span>
+                )}
+              </>
+            )}
+            {isSidebarCollapsed && stats.pendingApprovals > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             )}
           </button>
+          <button 
+             onClick={() => handleSwitchView(View.API_TESTING)}
+             className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.API_TESTING ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+             title={isSidebarCollapsed ? 'API Testing' : undefined}
+          >
+            <Code className="w-5 h-5 flex-shrink-0" />
+            {!isSidebarCollapsed && <span>API Testing</span>}
+          </button>
         </nav>
-        <div className="p-4 border-t border-gray-100">
-             <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200">
-                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">PM</div>
-                 <div>
+        <div className={`p-4 border-t border-gray-100 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
+             <div className={`flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200 ${isSidebarCollapsed ? 'w-8 h-8 p-0 justify-center' : ''}`}>
+                 <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">PM</div>
+                 {!isSidebarCollapsed && (
+                   <div>
                      <p className="text-xs font-bold text-gray-900">Project Manager</p>
                      <p className="text-[10px] text-gray-500">Admin Access</p>
-                 </div>
+                   </div>
+                 )}
              </div>
         </div>
       </aside>
@@ -221,6 +265,13 @@ function App() {
                 project={selectedProject}
                 logs={logs.filter(l => l.projectId === selectedProject.id)}
                 onBack={handleBackToTable}
+                onAnalyze={handleAnalyzeProject}
+            />
+        ) : selectedSimPROProject ? (
+            <SimPROProjectDetail 
+                project={selectedSimPROProject}
+                logs={simproLogs.filter(l => l.projectId === selectedSimPROProject.id)}
+                onBack={handleBackToSimPROTable}
                 onAnalyze={handleAnalyzeProject}
             />
         ) : (
@@ -300,6 +351,19 @@ function App() {
                     </div>
                   )}
 
+                  {/* SimPRO Projects View */}
+                  {currentView === View.SIMPRO_PROJECTS && (
+                    <div className="max-w-full h-full">
+                      <SimPROProjectTable 
+                        projects={simproProjects.filter(p => 
+                            p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            p.client.toLowerCase().includes(searchQuery.toLowerCase())
+                        )} 
+                        onSelectProject={handleSelectSimPROProject} 
+                      />
+                    </div>
+                  )}
+
                   {/* Approvals View */}
                   {currentView === View.APPROVALS && (
                     <div className="max-w-5xl mx-auto">
@@ -310,12 +374,20 @@ function App() {
                       />
                     </div>
                   )}
+
+                  {
+                    currentView === View.API_TESTING && (
+                      <div className="max-w-5xl mx-auto">
+                        <API_Testing />
+                      </div>
+                    )
+                  }
                 </div>
             </>
         )}
 
         {/* Bottom Navigation (Mobile & Tablet - Visible below LG) */}
-        {!selectedProject && (
+        {!selectedProject && !selectedSimPROProject && (
             <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around p-2 z-30 pb-safe">
                 <button 
                     onClick={() => handleSwitchView(View.DASHBOARD)}

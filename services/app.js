@@ -1,21 +1,6 @@
-import express from "express";
-import mysql from "mysql2/promise";
-import cors from "cors";
-import dotenv from "dotenv";
-import { fileURLToPath } from "url";
-import path from "path";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.join(__dirname, "..", ".env") });
-
-console.log("Database Config:", {
-    host: process.env.SQL_HOST,
-    user: process.env.SQL_USER,
-    database: process.env.DATABASE_NAME,
-    port: process.env.SQL_PORT
-});
+import express from 'express';
+import cors from 'cors';
+import { sequelize, Project, Job, Worker, Approval } from '../models/models/index.js';
 
 const app = express();
 app.use(cors());
@@ -180,14 +165,34 @@ app.get("/workers", async (req, res) => {
 
 // ----------------- APPROVAL ROUTES -----------------
 app.get("/approvals", async (req, res) => {
-    try {
-        const [rows] = await db.query("SELECT * FROM approvals");
-        res.json(rows);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+    const approvals = await Approval.findAll();
+    res.json(approvals);
 });
 
+app.get("/approvals/:id", async (req, res) => {
+    const approval = await Approval.findByPk(req.params.id);
+    if (!approval) return res.status(404).json({ error: "Approval not found" });
+    res.json(approval);
+});
+
+app.post("/approvals", async (req, res) => {
+    const newApproval = await Approval.create(req.body);
+    res.json(newApproval);
+});
+
+app.put("/approvals/:id", async (req, res) => {
+    const approval = await Approval.findByPk(req.params.id);
+    if (!approval) return res.status(404).json({ error: "Approval not found" });
+    await approval.update(req.body);
+    res.json(approval);
+});
+
+app.delete("/approvals/:id", async (req, res) => {
+    const approval = await Approval.findByPk(req.params.id);
+    if (!approval) return res.status(404).json({ error: "Approval not found" });
+    await approval.destroy();
+    res.json({ message: "Approval deleted" });
+});
 
 // ----------------- START SERVER -----------------
 const API_PORT = process.env.API_PORT || 3001;

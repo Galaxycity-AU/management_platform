@@ -1,5 +1,6 @@
 
 import { Project, ProjectStatus, WorkerLog, LogStatus } from '../types';
+import { truncateClientName } from '../utils/stringUtils';
 
 const CLIENTS = ['Acme Corp', 'Globex', 'Soylent Corp', 'Initech', 'Massive Dynamic', 'Stark Ind'];
 const ROLES = ['Frontend Dev', 'Backend Dev', 'Designer', 'QA Engineer', 'DevOps'];
@@ -46,7 +47,7 @@ export const generateMockData = (): { projects: Project[]; logs: WorkerLog[] } =
     const project: Project = {
       id: `proj-${i}`,
       name: `${getRandomElement(PROJECT_PREFIXES)} ${getRandomElement(PROJECT_SUFFIXES)} ${i}`,
-      client: getRandomElement(CLIENTS),
+      client: truncateClientName(getRandomElement(CLIENTS)),
       description: `Strategic implementation of ${getRandomElement(PROJECT_SUFFIXES)} for ${getRandomElement(CLIENTS)}.`,
       status,
       scheduledStart,
