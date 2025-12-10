@@ -27,20 +27,20 @@ const CentraliseView = () => {
   const scheduleGridScrollRef = useRef(null);
   const isScrollingRef = useRef(false);
 
-  // Helper function to parse time string (HH:MM:SS or HH:MM) to hours
-  const parseTimeToHours = (timeString: string): number => {
-    if (!timeString) return 0;
-    const parts = timeString.split(':');
-    const hours = parseInt(parts[0], 10) || 0;
-    const minutes = parseInt(parts[1], 10) || 0;
-    return hours + minutes / 60;
+  // Helper function to parse datetime string to hours
+  const parseTimeToHours = (datetimeString: string): number => {
+    if (!datetimeString) return 0;
+    const date = new Date(datetimeString);
+    return date.getHours() + date.getMinutes() / 60;
   };
 
-  // Helper function to calculate duration in hours from start and end time
-  const calculateDuration = (startTime: string, endTime: string): number => {
-    const start = parseTimeToHours(startTime);
-    const end = parseTimeToHours(endTime);
-    return end - start;
+  // Helper function to calculate duration in hours from start and end datetime
+  const calculateDuration = (startDatetime: string, endDatetime: string): number => {
+    if (!startDatetime || !endDatetime) return 0;
+    const start = new Date(startDatetime);
+    const end = new Date(endDatetime);
+    const durationMs = end.getTime() - start.getTime();
+    return durationMs / (1000 * 60 * 60); // Convert milliseconds to hours
   };
 
   // Data loading function
@@ -69,10 +69,13 @@ const CentraliseView = () => {
       // Transform workers to resources format
       const transformedResources = workersData.map((worker: any) => {
         // Calculate total hours for this worker from their jobs
-        const workerJobs = jobsData.filter((job: any) => job.workerId === worker.id);
+        const workerJobs = jobsData.filter((job: any) => job.worker_id === worker.id);
         const totalHours = workerJobs.reduce((sum: number, job: any) => {
-          if (job.startTime && job.endTime) {
-            return sum + calculateDuration(job.startTime, job.endTime);
+          // Use scheduled times, or actual times, or modified times
+          const startTime = job.actual_start || job.modified_start || job.scheduled_start;
+          const endTime = job.actual_end || job.modified_end || job.scheduled_end;
+          if (startTime && endTime) {
+            return sum + calculateDuration(startTime, endTime);
           }
           return sum;
         }, 0);
@@ -89,31 +92,46 @@ const CentraliseView = () => {
 
       // Transform jobs to scheduledJobs format
       const transformedJobs = jobsData
-        .filter((job: any) => job.startTime && job.endTime && job.jobDate) // Only include jobs with valid time data
+        .filter((job: any) => {
+          // Use scheduled_start or modified_start or actual_start
+          const startTime = job.actual_start || job.modified_start || job.scheduled_start;
+          const endTime = job.actual_end || job.modified_end || job.scheduled_end;
+          return startTime && endTime; // Only include jobs with valid time data
+        })
         .map((job: any) => {
-          const project = projectsMap.get(job.projectId);
-          const projectTitle = project?.title || `Project ${job.projectId}`;
+          const project = projectsMap.get(job.project_id);
+          const projectName = project?.name || `Project ${job.project_id}`;
           
-          const startHour = parseTimeToHours(job.startTime);
-          const duration = calculateDuration(job.startTime, job.endTime);
+          // Use the most relevant times (actual > modified > scheduled)
+          const startDatetime = job.actual_start || job.modified_start || job.scheduled_start;
+          const endDatetime = job.actual_end || job.modified_end || job.scheduled_end;
+          
+          const startHour = parseTimeToHours(startDatetime);
+          const duration = calculateDuration(startDatetime, endDatetime);
           
           // Skip jobs with invalid duration
           if (duration <= 0) return null;
           
-          // Parse jobDate to Date object
-          const jobDate = new Date(job.jobDate);
+          // Parse date from datetime
+          const jobDate = new Date(startDatetime);
           
           // Skip invalid dates
           if (isNaN(jobDate.getTime())) return null;
           
-          // Generate color based on job id (for visual distinction)
-          const colors = ['#67e8f9', '#818cf8', '#a78bfa', '#f472b6', '#fb7185'];
-          const color = colors[job.id % colors.length];
+          // Generate color based on job status
+          const statusColors: Record<string, string> = {
+            'scheduled': '#818cf8',
+            'in_progress': '#fbbf24',
+            'completed': '#34d399',
+            'cancelled': '#ef4444',
+            'on_hold': '#9ca3af'
+          };
+          const color = statusColors[job.status] || '#67e8f9';
 
           return {
             id: job.id,
-            resourceId: job.workerId,
-            title: `(${duration.toFixed(2)}HRS) ${projectTitle}`,
+            resourceId: job.worker_id,
+            title: `(${duration.toFixed(1)}HRS) ${projectName}`,
             subtitle: project?.description || undefined,
             startHour: startHour,
             duration: duration,

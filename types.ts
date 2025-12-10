@@ -1,16 +1,16 @@
 
 export enum ProjectStatus {
-  PLANNING = 'Planning',
-  ACTIVE = 'Active',
-  COMPLETED = 'Completed',
-  ON_HOLD = 'On Hold',
-  DELAYED = 'Delayed'
+  PLANNING = 'planning',
+  ACTIVE = 'active',
+  COMPLETED = 'completed',
+  ON_HOLD = 'on hold',
+  DELAYED = 'delayed'
 }
 
 export enum LogStatus {
-  PENDING = 'Pending',
-  APPROVED = 'Approved',
-  REJECTED = 'Rejected'
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected'
 }
 
 export interface WorkerLog {

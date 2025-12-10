@@ -9,13 +9,15 @@ interface ProjectTableProps {
 }
 
 export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectProject }) => {
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'RISK' | 'PENDING' | 'ARCHIVED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'RISK' | 'PENDING' | 'COMPLETED'>('ALL');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Project; direction: 'asc' | 'desc' } | null>(null);
 
   const filteredProjects = projects.filter(p => {
     if (!checkTimeFilter(p, timeFilter)) return false;
     if (statusFilter === 'ACTIVE') return p.status === ProjectStatus.ACTIVE;
+    if (statusFilter === 'PENDING') return p.status === ProjectStatus.PLANNING;
+    if (statusFilter === 'COMPLETED') return p.status === ProjectStatus.COMPLETED;
     if (statusFilter === 'RISK') return isAtRisk(p);
     return true;
   });
@@ -74,10 +76,10 @@ export const ProjectTable: React.FC<ProjectTableProps> = ({ projects, onSelectPr
                 At Risk
               </button>
               <button 
-                onClick={() => setStatusFilter('ARCHIVED')}
-                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'ARCHIVED' ? 'bg-gray-50 text-gray-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setStatusFilter('COMPLETED')}
+                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'COMPLETED' ? 'bg-gray-50 text-gray-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
               >
-                Archived
+                Completed
               </button>
            </div>
         </div>

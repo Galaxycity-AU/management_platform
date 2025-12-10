@@ -14,29 +14,30 @@ const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit'
 
 // A Unified Gantt Chart Component for Workers
 const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
+  const [hoveredLog, setHoveredLog] = React.useState<string | null>(null);
+  
   if (logs.length === 0) return null;
 
   // 1. Determine Time Range for the Chart
-  // Default to 08:00 AM to 06:00 PM (10 hours) unless logs go outside
+  // Default to 08:00 AM to 07:00 PM (11 hours) unless logs go outside
   let minTime = new Date();
   minTime.setHours(8, 0, 0, 0);
   
   let maxTime = new Date();
-  maxTime.setHours(18, 0, 0, 0);
+  maxTime.setHours(19, 0, 0, 0);
 
   // Expand range based on actual log data
   logs.forEach(log => {
     if (log.scheduledStart < minTime) minTime = new Date(log.scheduledStart);
     if (log.scheduledEnd > maxTime) maxTime = new Date(log.scheduledEnd);
     if (log.actualStart && log.actualStart < minTime) minTime = new Date(log.actualStart);
-    // For end time, if it's active, we might want to extend to "Now" if now > maxTime
     const endRef = log.actualEnd || new Date();
     if (endRef > maxTime) maxTime = endRef;
   });
 
-  // Add 30 min buffer
-  minTime = new Date(minTime.getTime() - 30 * 60000);
-  maxTime = new Date(maxTime.getTime() + 30 * 60000);
+  // Add 1 hour buffer on each side
+  minTime = new Date(minTime.getTime() - 60 * 60000);
+  maxTime = new Date(maxTime.getTime() + 60 * 60000);
 
   const totalDuration = maxTime.getTime() - minTime.getTime();
 
@@ -61,79 +62,145 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
   const currentPos = getPos(now);
   const isToday = logs.some(l => l.scheduledStart.getDate() === now.getDate());
 
+  // Calculate duration
+  const calculateDuration = (start: Date, end: Date | null) => {
+    const endTime = end || now;
+    const diff = endTime.getTime() - start.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
   return (
-    <div className="mt-4">
-      {/* Time Axis Header */}
-      <div className="relative h-6 w-full border-b border-gray-200 mb-2">
-        {markers.map((time, i) => (
-          <div 
-            key={i} 
-            className="absolute bottom-0 text-[10px] text-gray-400 transform -translate-x-1/2 border-l border-gray-200 h-full pl-1"
-            style={{ left: `${getPos(time)}%` }}
-          >
-            {time.getHours()}:00
-          </div>
-        ))}
+    <div className="mt-4 relative">
+      {/* Time Axis Header - Clean Design */}
+      <div className="relative h-8 w-full mb-4 pl-28">
+        <div className="relative h-full">
+          {markers.map((time, i) => (
+            <div 
+              key={i} 
+              className="absolute top-0 text-[11px] text-gray-400 font-medium"
+              style={{ left: `${getPos(time)}%` }}
+            >
+              {time.getHours()}:00
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Workers Rows */}
-      <div className="space-y-4">
-        {logs.map((log) => {
+      <div className="space-y-1">
+        {logs.map((log, idx) => {
           const schedLeft = getPos(log.scheduledStart);
           const schedWidth = getPos(log.scheduledEnd) - schedLeft;
           
-          const actualStart = log.actualStart || log.scheduledStart; // Fallback for display if null (rare)
+          const actualStart = log.actualStart || log.scheduledStart;
           const actualEnd = log.actualEnd || now;
           const isLive = !log.actualEnd;
           
           const actualLeft = getPos(actualStart);
-          const actualWidth = Math.max(1, getPos(actualEnd) - actualLeft); // Min width 1%
+          const actualWidth = Math.max(2, getPos(actualEnd) - actualLeft);
 
-          // Status colors
-          const barColor = isLive ? 'bg-green-500' : (log.status === LogStatus.APPROVED ? 'bg-blue-500' : 'bg-amber-400');
+          // Enhanced status colors matching the screenshot
+          let barColor = 'bg-blue-500';
+          let statusText = 'Done';
+          let statusColor = 'text-gray-700';
+          let timeText = '';
+          
+          if (isLive) {
+            barColor = 'bg-green-500';
+            statusText = 'Active';
+            statusColor = 'text-green-600';
+            timeText = `${formatTime(actualStart)} - ...`;
+          } else if (log.status === LogStatus.APPROVED) {
+            barColor = 'bg-blue-500';
+            statusText = 'Done';
+            statusColor = 'text-gray-700';
+            timeText = `${formatTime(actualStart)} - ${formatTime(actualEnd)}`;
+          } else {
+            barColor = 'bg-amber-500';
+            statusText = 'Pending';
+            statusColor = 'text-amber-600';
+            timeText = log.actualStart ? `${formatTime(actualStart)} - ${log.actualEnd ? formatTime(actualEnd) : 'Now'}` : '--';
+          }
+
+          const isHovered = hoveredLog === log.id;
+          
+          // Generate initials for avatar
+          const initials = log.workerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          const avatarColors = ['bg-indigo-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500'];
+          const avatarColor = avatarColors[idx % avatarColors.length];
           
           return (
-            <div key={log.id} className="group relative">
+            <div 
+              key={log.id} 
+              className="group relative"
+              onMouseEnter={() => setHoveredLog(log.id)}
+              onMouseLeave={() => setHoveredLog(null)}
+            >
               {/* Row Content */}
-              <div className="flex items-center gap-4 mb-1">
-                 <div className="w-32 flex-shrink-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{log.workerName}</p>
-                    <p className="text-xs text-gray-500 truncate">{log.role}</p>
+              <div className="flex items-center gap-3 py-2 hover:bg-gray-50/50 rounded-lg transition-colors">
+                 {/* Worker Info with Avatar */}
+                 <div className="w-28 flex-shrink-0 flex items-center gap-2 pl-2">
+                    <div className={`w-8 h-8 ${avatarColor} rounded-full flex items-center justify-center text-white text-xs font-bold`}>
+                      {initials}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{log.workerName}</p>
+                      <p className="text-xs text-gray-500 truncate">{log.role}</p>
+                    </div>
                  </div>
                  
-                 {/* Timeline Track */}
-                 <div className="flex-1 relative h-8 bg-gray-50 rounded border border-gray-100 overflow-hidden">
-                    {/* Grid Lines for this row */}
+                 {/* Timeline Track - Cleaner design */}
+                 <div className="flex-1 relative h-10">
+                    {/* Vertical grid lines - subtle */}
                     {markers.map((time, i) => (
-                        <div key={i} className="absolute top-0 bottom-0 w-px bg-gray-200 opacity-30" style={{ left: `${getPos(time)}%` }}></div>
+                        <div 
+                          key={i} 
+                          className="absolute top-0 bottom-0 border-l border-gray-100" 
+                          style={{ left: `${getPos(time)}%` }}
+                        ></div>
                     ))}
 
-                    {/* Scheduled Bar (Background) */}
+                    {/* Scheduled Bar (Background) - Very subtle */}
                     <div 
-                        className="absolute top-1.5 h-5 bg-indigo-100/50 border border-indigo-200 border-dashed rounded-sm"
+                        className="absolute top-1/2 -translate-y-1/2 h-3 bg-gray-100 rounded-md opacity-60"
                         style={{ left: `${schedLeft}%`, width: `${schedWidth}%` }}
                     ></div>
 
-                    {/* Actual Bar (Foreground) */}
+                    {/* Actual Bar (Foreground) - Bold and clean */}
                     {log.actualStart && (
                          <div 
-                            className={`absolute top-2.5 h-3 rounded-full shadow-sm ${barColor} transition-all duration-500`}
+                            className={`absolute top-1/2 -translate-y-1/2 h-4 rounded-md ${barColor} transition-all duration-300 shadow-sm ${
+                              isHovered ? 'shadow-md scale-y-110' : ''
+                            }`}
                             style={{ left: `${actualLeft}%`, width: `${actualWidth}%` }}
                          >
-                            {isLive && (
-                                <span className="absolute -right-1 top-0 bottom-0 w-2 bg-white/30 animate-pulse rounded-full"></span>
+                            {/* Tooltip on hover */}
+                            {isHovered && (
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none">
+                                <div className="font-semibold">{log.workerName}</div>
+                                <div className="text-gray-300 text-[10px] mt-1">
+                                  {log.actualStart ? formatTime(log.actualStart) : '--'} - {log.actualEnd ? formatTime(log.actualEnd) : 'Ongoing'}
+                                </div>
+                                <div className="text-gray-300 text-[10px]">
+                                  Duration: {calculateDuration(actualStart, log.actualEnd)}
+                                </div>
+                                {log.notes && <div className="text-gray-400 text-[10px] italic mt-1">"{log.notes}"</div>}
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                              </div>
                             )}
                          </div>
                     )}
                  </div>
 
-                 {/* Text Values */}
-                 <div className="w-24 flex-shrink-0 text-right">
-                     <div className={`text-xs font-semibold ${isLive ? 'text-green-600' : 'text-gray-600'}`}>
-                        {isLive ? 'Active' : 'Done'}
+                 {/* Status & Time Info - Right aligned like screenshot */}
+                 <div className="w-32 flex-shrink-0 text-right pr-2">
+                     <div className={`text-sm font-semibold ${statusColor} mb-0.5`}>
+                        {statusText}
                      </div>
-                     <div className="text-[10px] text-gray-400">
-                        {log.actualStart ? formatTime(log.actualStart) : '--'} - {isLive ? 'Now' : (log.actualEnd ? formatTime(log.actualEnd) : '--')}
+                     <div className="text-[11px] text-gray-500">
+                        {timeText}
                      </div>
                  </div>
               </div>
@@ -142,20 +209,17 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
         })}
       </div>
       
-      {/* Current Time Indicator (Vertical Line) */}
+      {/* Current Time Indicator (Vertical Line) - Matches screenshot */}
       {isToday && currentPos > 0 && currentPos < 100 && (
-         <div className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none" style={{ left: `${currentPos}%`, top: '40px' }}> {/* Adjust top based on layout */}
-             <div className="absolute -top-1 -translate-x-1/2 text-[9px] bg-red-500 text-white px-1 rounded">Now</div>
+         <div 
+           className="absolute top-0 bottom-0 w-px bg-red-500 z-30 pointer-events-none" 
+           style={{ left: `calc(${currentPos}% + 112px)`, top: '32px' }}
+         >
+             <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap">
+               Now
+             </div>
          </div>
       )}
-      
-      {/* Legend */}
-      <div className="flex gap-4 mt-4 text-[10px] text-gray-500 justify-end">
-         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-100 border border-indigo-200 border-dashed"></div> Scheduled</div>
-         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div> Active</div>
-         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> Completed</div>
-         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded-full"></div> Pending Review</div>
-      </div>
     </div>
   );
 };

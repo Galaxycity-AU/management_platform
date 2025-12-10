@@ -1,124 +1,228 @@
-import { sequelize, Project, Job, Worker, Approval } from '../models/models/index.js';
+import db from "../models/database.js";
 
+// Helpers
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function randFloat(min, max, decimals = 2) {
-  const v = Math.random() * (max - min) + min;
-  return Number(v.toFixed(decimals));
+  return Number((Math.random() * (max - min) + min).toFixed(decimals));
 }
 
-function timeStringFromMinutes(minutes) {
-  const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
-  const mm = String(minutes % 60).padStart(2, '0');
+function timeStringFromMinutes(min) {
+  const hh = String(Math.floor(min / 60)).padStart(2, "0");
+  const mm = String(min % 60).padStart(2, "0");
   return `${hh}:${mm}:00`;
 }
 
 async function main() {
   try {
-    console.log('Connecting to DB...');
-    await sequelize.authenticate();
-    console.log('DB connected — syncing models (no destructive changes).');
-    await sequelize.sync();
+    console.log("Connecting...");
+    const conn = await db.getConnection();
+    conn.release();
+    console.log("Database connected.");
 
-    // Clear existing data to avoid unique constraint and FK issues.
-    // Temporarily disable foreign key checks so we can truncate in any order.
-    console.log('Clearing existing data from Approval, Job, Project, Worker tables (disabling FK checks)...');
-    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
-    await Approval.destroy({ where: {}, truncate: true, cascade: true });
-    await Job.destroy({ where: {}, truncate: true, cascade: true });
-    await Project.destroy({ where: {}, truncate: true, cascade: true });
-    await Worker.destroy({ where: {}, truncate: true, cascade: true });
-    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    console.log("Clearing existing data...");
+    await db.query("SET FOREIGN_KEY_CHECKS = 0");
+    await db.query("TRUNCATE TABLE approvals");
+    await db.query("TRUNCATE TABLE job_workers");
+    await db.query("TRUNCATE TABLE jobs");
+    await db.query("TRUNCATE TABLE projects");
+    await db.query("TRUNCATE TABLE workers");
+    await db.query("SET FOREIGN_KEY_CHECKS = 1");
 
-    // Create Workers
-    const positions = ['Technician', 'Operator', 'Engineer', 'Supervisor', 'Administrator'];
+    // -------------------------------
+    // WORKERS
+    // -------------------------------
+    const workerNames = [
+      "John Smith", "Emily Carter", "Michael Brown", "Sarah Johnson",
+      "Daniel Wilson", "Kevin Murphy", "Laura Nguyen", "David Cooper",
+      "James Lee", "Ella Thompson", "Olivia Davis", "Robert Clark",
+      "Grace Miller", "Jack Harris", "Amelia White", "Liam Martin",
+      "Ava Walker", "Thomas King", "Sophie Allen", "Henry Wright"
+    ];
+
+    const positions = [
+      "Carpenter", "Electrician", "Plumber", "Laborer", "Site Supervisor",
+      "Project Manager", "Foreman", "Heavy Equipment Operator", "Painter",
+      "HVAC Technician", "Welder", "Mason", "Roofer"
+    ];
+
+    console.log("Creating workers...");
     const workers = [];
-    for (let i = 1; i <= 40; i++) {
-      const w = await Worker.create({
-        name: `Worker ${i}`,
-        email: `worker${i}@example.local`,
-        position: positions[i % positions.length]
-      });
-      workers.push(w);
-    }
-    console.log(`Created ${workers.length} workers`);
+    for (let name of workerNames) {
+      const email = name.toLowerCase().replace(/ /g, ".") + "@gcsda.com.au";
+      const phone = `04${randInt(10, 99)} ${randInt(100, 999)} ${randInt(100, 999)}`;
+      const position = positions[randInt(0, positions.length - 1)];
 
-    // Create Projects
-    const statuses = ['active', 'paused', 'completed', 'planning'];
+      const [result] = await db.query(
+        "INSERT INTO workers (name, position, email, phone) VALUES (?, ?, ?, ?)",
+        [name, position, email, phone]
+      );
+
+      workers.push({ id: result.insertId, name, position });
+    }
+    console.log(`Workers created: ${workers.length}`);
+
+    // -------------------------------
+    // PROJECTS
+    // -------------------------------
+    const projectList = [
+      "Illowra SDA Complex – Stage 1",
+      "Merriweather Apartments Fit-out",
+      "King St Disability Housing Upgrade",
+      "Somerville Road Townhouse Build",
+      "Highton SDA Renovation Project",
+      "Footscray Social Housing Upgrade",
+      "Apex Road Warehousing Extension",
+      "Lara SDA New Build"
+    ];
+
+    const clients = [
+      "Melbourne City Council", "Victoria Housing Trust", "SDA Property Group",
+      "Disability Services Australia", "Urban Development Corp", "Community Housing Ltd"
+    ];
+
+    const managers = [
+      "Jennifer Wilson", "Andrew Chen", "Rebecca Martinez", "Christopher Lee",
+      "Michelle Taylor", "David Anderson", "Patricia Brown"
+    ];
+
+    const statuses = ["active", "completed", "planning"];
     const projects = [];
-    for (let i = 1; i <= 40; i++) {
-      const manager = workers[randInt(0, workers.length - 1)];
-      const deadline = new Date(Date.now() + randInt(1, 120) * 24 * 60 * 60 * 1000);
-      const p = await Project.create({
-        title: `Project ${i}`,
-        description: `Auto-generated project ${i}`,
-        managerId: manager.id,
-        status: statuses[randInt(0, statuses.length - 1)],
-        progress: randFloat(0, 100, 1),
-        budget: randFloat(1000, 200000, 2),
-        expenses: randFloat(0, 50000, 2),
-        deadline
-      });
-      projects.push(p);
-    }
-    console.log(`Created ${projects.length} projects`);
 
-    // Create Jobs
-    const jobStatuses = ['pending', 'approved', 'rejected', 'in_review', 'completed'];
+    console.log("Creating projects...");
+    for (let name of projectList) {
+      // Generate deadline 30-180 days from now
+      const deadline = new Date(Date.now() + randInt(30, 180) * 86400000);
+      const client = clients[randInt(0, clients.length - 1)];
+      const manager = managers[randInt(0, managers.length - 1)];
+
+      const [result] = await db.query(
+        `INSERT INTO projects (name, description, deadline, status, client, manager, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [name, `Project: ${name}`, deadline, statuses[randInt(0, statuses.length - 1)], client, manager, new Date()]
+      );
+      projects.push({ id: result.insertId, name });
+    }
+    console.log(`Projects created: ${projects.length}`);
+
+    // -------------------------------
+    // JOBS
+    // -------------------------------
+    const tasks = [
+      "Concrete Pouring", "Electrical Rough-in", "Site Cleaning", "Plumbing Installation",
+      "Wall Framing", "Roofing Inspection", "Safety Audit", "Material Delivery Check",
+      "Painting Prep Work", "Carpentry Fix", "HVAC Installation", "Drywall Installation",
+      "Flooring Installation", "Window Installation", "Door Installation", "Demolition Work"
+    ];
+
+    const jobStatuses = ["scheduled", "in_progress", "completed", "cancelled", "on_hold"];
     const jobs = [];
-    for (let i = 1; i <= 40; i++) {
-      const worker = workers[randInt(0, workers.length - 1)];
+
+    console.log("Creating jobs...");
+    for (let i = 0; i < 80; i++) {
       const project = projects[randInt(0, projects.length - 1)];
+      const worker = workers[randInt(0, workers.length - 1)];
+      const status = jobStatuses[randInt(0, jobStatuses.length - 1)];
 
-      // job date within +/- 15 days
-      const jobDate = new Date(Date.now() + randInt(-15, 15) * 24 * 60 * 60 * 1000);
-      const startMinutes = randInt(8 * 60, 11 * 60); // between 08:00 and 11:59
-      const durationMinutes = randInt(4 * 60, 9 * 60); // 4-9 hours
-      const endMinutes = startMinutes + durationMinutes;
+      // Generate scheduled start date/time (within -10 to +20 days from now)
+      const scheduledStart = new Date(Date.now() + randInt(-10, 20) * 86400000);
+      scheduledStart.setHours(randInt(6, 10), randInt(0, 59), 0, 0);
 
-      const job = await Job.create({
-        workerId: worker.id,
-        projectId: project.id,
-        jobDate,
-        startTime: timeStringFromMinutes(startMinutes),
-        endTime: timeStringFromMinutes(endMinutes),
-        clockedInTime: null,
-        clockedOutTime: null,
-        editedInTime: null,
-        editedOutTime: null,
-        status: jobStatuses[randInt(0, jobStatuses.length - 1)]
-      });
-      jobs.push(job);
-    }
-    console.log(`Created ${jobs.length} jobs`);
+      // Generate scheduled end date/time (4-8 hours after start)
+      const scheduledEnd = new Date(scheduledStart.getTime() + randInt(4, 8) * 3600000);
 
-    // Create Approvals (one approval per job)
-    const approvalStatuses = ['approved', 'rejected', 'pending'];
-    const approvals = [];
-    for (const job of jobs) {
-      // choose an approver that is not the job worker (if possible)
-      let approver = workers[randInt(0, workers.length - 1)];
-      if (workers.length > 1 && approver.id === job.workerId) {
-        approver = workers.find(w => w.id !== job.workerId) || approver;
+      // For completed or in_progress jobs, generate actual times
+      let actualStart = null;
+      let actualEnd = null;
+      if (status === 'completed' || status === 'in_progress') {
+        // Actual start might be slightly earlier/later than scheduled (-30 to +60 minutes)
+        actualStart = new Date(scheduledStart.getTime() + randInt(-30, 60) * 60000);
+        if (status === 'completed') {
+          // Actual end might differ from scheduled (-60 to +120 minutes)
+          actualEnd = new Date(scheduledEnd.getTime() + randInt(-60, 120) * 60000);
+        }
       }
-      const approvalDate = new Date(new Date(job.jobDate).getTime() + randInt(0, 2) * 24 * 60 * 60 * 1000);
-      const a = await Approval.create({
-        jobId: job.id,
-        approverId: approver.id,
-        approvalDate,
-        status: approvalStatuses[randInt(0, approvalStatuses.length - 1)],
-        comments: `Auto approval for job ${job.id}`
-      });
-      approvals.push(a);
-    }
-    console.log(`Created ${approvals.length} approvals`);
 
-    console.log('Seeding complete.');
+      // Sometimes jobs get rescheduled (20% chance)
+      let modifiedStart = null;
+      let modifiedEnd = null;
+      if (Math.random() < 0.2) {
+        // Modified time is 1-3 days different from scheduled
+        modifiedStart = new Date(scheduledStart.getTime() + randInt(-3, 3) * 86400000);
+        modifiedStart.setHours(randInt(6, 10), randInt(0, 59), 0, 0);
+        modifiedEnd = new Date(modifiedStart.getTime() + randInt(4, 8) * 3600000);
+      }
+
+      const [result] = await db.query(
+        `INSERT INTO jobs 
+         (project_id, worker_id, status, scheduled_start, scheduled_end, 
+          actual_start, actual_end, modified_start, modified_end)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          project.id,
+          worker.id,
+          status,
+          scheduledStart,
+          scheduledEnd,
+          actualStart,
+          actualEnd,
+          modifiedStart,
+          modifiedEnd
+        ]
+      );
+
+      jobs.push({ id: result.insertId, projectId: project.id, workerId: worker.id });
+    }
+    console.log(`Jobs created: ${jobs.length}`);
+
+    // -------------------------------
+    // APPROVALS (Simplified - just approver and comments)
+    // -------------------------------
+    console.log("Creating approvals...");
+    let approvalCount = 0;
+    
+    // Create approvals for about 60% of jobs
+    for (const job of jobs) {
+      if (Math.random() < 0.6) {
+        const approver = workers[randInt(0, workers.length - 1)];
+        
+        // Make sure approver is not the same as worker
+        let finalApprover = approver;
+        if (approver.id === job.workerId) {
+          finalApprover = workers.find(w => w.id !== job.workerId) || approver;
+        }
+        
+        const commentTemplates = [
+          `Approved by ${finalApprover.name} - Good work`,
+          `Reviewed and approved - ${finalApprover.name}`,
+          `Please adjust start time - ${finalApprover.name}`,
+          `Safety concerns noted - ${finalApprover.name}`,
+          `Timeline looks good - ${finalApprover.name}`,
+          `Need to reschedule - ${finalApprover.name}`,
+          `Resources confirmed - ${finalApprover.name}`
+        ];
+
+        await db.query(
+          `INSERT INTO approvals (job_id, approver_id, comments)
+           VALUES (?, ?, ?)`,
+          [
+            job.id,
+            finalApprover.id,
+            commentTemplates[randInt(0, commentTemplates.length - 1)]
+          ]
+        );
+        approvalCount++;
+      }
+    }
+
+    console.log(`Approvals created: ${approvalCount}`);
+    console.log("Seeding complete.");
     process.exit(0);
+
   } catch (err) {
-    console.error('Seeding failed:', err);
+    console.error("Seeding failed:", err);
     process.exit(1);
   }
 }

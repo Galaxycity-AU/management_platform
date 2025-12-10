@@ -9,7 +9,7 @@ interface SimPROProjectTableProps {
 }
 
 export const SimPROProjectTable: React.FC<SimPROProjectTableProps> = ({ projects, onSelectProject }) => {
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'RISK' | 'PENDING' | 'ARCHIVED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'RISK' | 'PENDING' | 'COMPLETED'>('ALL');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('ALL');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Project; direction: 'asc' | 'desc' } | null>(null);
 
@@ -74,10 +74,10 @@ export const SimPROProjectTable: React.FC<SimPROProjectTableProps> = ({ projects
                 At Risk
               </button>
               <button 
-                onClick={() => setStatusFilter('ARCHIVED')}
-                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'ARCHIVED' ? 'bg-gray-50 text-gray-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => setStatusFilter('COMPLETED')}
+                className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${statusFilter === 'COMPLETED' ? 'bg-gray-50 text-gray-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
               >
-                Archived
+                Completed
               </button>
            </div>
         </div>

@@ -8,6 +8,29 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ logs, currentDate }) => {
+  const [hoveredLog, setHoveredLog] = React.useState<string | null>(null);
+  const [scrollLeft, setScrollLeft] = React.useState(0);
+  const headerScrollRef = React.useRef<HTMLDivElement>(null);
+  const rowScrollRefs = React.useRef<Map<string, HTMLDivElement>>(new Map());
+
+  // Synchronize scroll across all timeline elements
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>, sourceId: string) => {
+    const scrollLeftValue = e.currentTarget.scrollLeft;
+    setScrollLeft(scrollLeftValue);
+    
+    // Update header scroll
+    if (headerScrollRef.current && sourceId !== 'header') {
+      headerScrollRef.current.scrollLeft = scrollLeftValue;
+    }
+    
+    // Update all row scrolls
+    rowScrollRefs.current.forEach((ref, id) => {
+      if (ref && id !== sourceId) {
+        ref.scrollLeft = scrollLeftValue;
+      }
+    });
+  };
+
   if (logs.length === 0) return (
       <div className="py-12 flex flex-col items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
           <Clock className="w-10 h-10 mb-2 opacity-20" />
@@ -15,33 +38,33 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
       </div>
   );
 
-  let minTime = new Date(currentDate);
-  minTime.setHours(8, 0, 0, 0);
-  let maxTime = new Date(currentDate);
-  maxTime.setHours(18, 0, 0, 0);
+  // Full 24-hour timeline
+  const minTime = new Date(currentDate);
+  minTime.setHours(0, 0, 0, 0);
+  
+  const maxTime = new Date(currentDate);
+  maxTime.setHours(23, 59, 59, 999);
 
-  logs.forEach(log => {
-    if (log.scheduledStart < minTime) minTime = new Date(log.scheduledStart);
-    if (log.scheduledEnd > maxTime) maxTime = new Date(log.scheduledEnd);
-    if (log.actualStart && log.actualStart < minTime) minTime = new Date(log.actualStart);
-    const endRef = log.actualEnd || new Date();
-    // Only extend for "live" logs if they belong to today. If viewing past, clip it? 
-    // For simplicity, just use the endRef.
-    if (endRef > maxTime) maxTime = endRef;
-  });
-
-  minTime = new Date(minTime.getTime() - 30 * 60000);
-  maxTime = new Date(maxTime.getTime() + 30 * 60000);
   const totalDuration = maxTime.getTime() - minTime.getTime();
-  const getPos = (date: Date) => Math.max(0, Math.min(100, ((date.getTime() - minTime.getTime()) / totalDuration) * 100));
+  const getPos = (date: Date) => {
+    // Ensure the date is within the same day for proper calculation
+    const dateTime = new Date(date);
+    const dayStart = new Date(currentDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(currentDate);
+    dayEnd.setHours(23, 59, 59, 999);
+    
+    // Clamp the time to the current day
+    const clampedTime = Math.max(dayStart.getTime(), Math.min(dayEnd.getTime(), dateTime.getTime()));
+    return ((clampedTime - minTime.getTime()) / totalDuration) * 100;
+  };
 
+  // Generate hour markers for full 24 hours
   const markers = [];
-  const curr = new Date(minTime);
-  curr.setMinutes(0, 0, 0);
-  if (curr < minTime) curr.setHours(curr.getHours() + 1);
-  while (curr < maxTime) {
-    markers.push(new Date(curr));
-    curr.setHours(curr.getHours() + 1);
+  for (let hour = 0; hour < 24; hour++) {
+    const time = new Date(currentDate);
+    time.setHours(hour, 0, 0, 0);
+    markers.push(time);
   }
 
   const now = new Date();
@@ -51,67 +74,222 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
                   
   const currentPos = getPos(now);
 
-  return (
-    <div className="mt-4 relative overflow-x-auto">
-      {/* Container with min-width to ensure scroll on mobile */}
-      <div className="min-w-[600px] pb-4">
-        <div className="relative h-6 w-full border-b border-gray-200 mb-4">
-            {markers.map((time, i) => (
-            <div key={i} className="absolute bottom-0 text-[10px] text-gray-400 transform -translate-x-1/2 border-l border-gray-200 h-full pl-1" style={{ left: `${getPos(time)}%` }}>
-                {time.getHours()}:00
-            </div>
-            ))}
-        </div>
-        <div className="space-y-6">
-            {logs.map((log) => {
-            const schedLeft = getPos(log.scheduledStart);
-            const schedWidth = getPos(log.scheduledEnd) - schedLeft;
-            const actualStart = log.actualStart || log.scheduledStart;
-            const actualEnd = log.actualEnd || (isToday ? now : log.scheduledEnd); // If looking at history and no end, assume filled schedule or handle differently
-            const isLive = !log.actualEnd && isToday;
-            
-            const actualLeft = getPos(actualStart);
-            const actualWidth = Math.max(1, getPos(actualEnd) - actualLeft);
-            const barColor = isLive ? 'bg-green-500' : (log.status === LogStatus.APPROVED ? 'bg-blue-500' : 'bg-amber-400');
+  // Calculate duration
+  const calculateDuration = (start: Date, end: Date | null) => {
+    const endTime = end || (isToday ? now : start);
+    const diff = Math.abs(endTime.getTime() - start.getTime());
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
 
-            return (
-                <div key={log.id} className="group flex items-center gap-4">
-                <div className="w-32 flex-shrink-0">
-                    <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-700">
-                                {log.workerName.charAt(0)}
-                            </div>
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-medium text-gray-900 truncate">{log.workerName}</p>
-                                <p className="text-[10px] text-gray-500 truncate">{log.role}</p>
-                            </div>
-                    </div>
-                </div>
-                <div className="flex-1 relative h-8 bg-gray-50 rounded border border-gray-100 overflow-hidden">
-                        {markers.map((time, i) => (<div key={i} className="absolute top-0 bottom-0 w-px bg-gray-200 opacity-30" style={{ left: `${getPos(time)}%` }}></div>))}
-                        <div className="absolute top-1.5 h-5 bg-indigo-100/50 border border-indigo-200 border-dashed rounded-sm" style={{ left: `${schedLeft}%`, width: `${schedWidth}%` }}></div>
-                        {log.actualStart && (
-                            <div className={`absolute top-2.5 h-3 rounded-full shadow-sm ${barColor} transition-all duration-500`} style={{ left: `${actualLeft}%`, width: `${actualWidth}%` }}>
-                                {isLive && <span className="absolute -right-1 top-0 bottom-0 w-2 bg-white/30 animate-pulse rounded-full"></span>}
-                            </div>
-                        )}
-                </div>
-                <div className="w-24 text-right flex-shrink-0">
-                    <div className={`text-xs font-bold ${isLive ? 'text-green-600' : 'text-gray-600'}`}>{isLive ? 'Active' : 'Done'}</div>
-                    <div className="text-[10px] text-gray-400">
-                        {log.actualStart ? formatTime(log.actualStart) : '--'} - {isLive ? '...' : (log.actualEnd ? formatTime(log.actualEnd) : '--')}
-                    </div>
-                </div>
-                </div>
-            );
-            })}
+  return (
+    <div className="mt-4 border border-gray-200 rounded-lg bg-white overflow-hidden relative">
+      {/* Header Row with Time Axis */}
+      <div className="flex border-b border-gray-200 bg-gray-50">
+        {/* Fixed Worker Column Header */}
+        <div className="w-44 flex-shrink-0 px-3 py-2 border-r border-gray-200 bg-gray-50">
+          <span className="text-xs font-semibold text-gray-600 uppercase">Worker</span>
         </div>
-        {isToday && currentPos > 0 && currentPos < 100 && (
-            <div className="absolute top-8 bottom-4 w-px bg-red-400 z-10 pointer-events-none border-l border-dashed border-red-500" style={{ left: `${currentPos}%` }}>
-                <div className="absolute -top-1 -translate-x-1/2 text-[9px] bg-red-500 text-white px-1 rounded shadow-sm whitespace-nowrap">Now</div>
-            </div>
-        )}
+        
+        {/* Scrollable Timeline Header */}
+        <div 
+          ref={headerScrollRef}
+          className="flex-1 overflow-x-auto" 
+          style={{ scrollbarWidth: 'thin' }}
+          onScroll={(e) => handleScroll(e, 'header')}
+        >
+          <div className="min-w-[1200px] relative h-8 px-4">
+            {markers.map((time, i) => {
+              const isBusinessHour = time.getHours() >= 8 && time.getHours() < 18;
+              return (
+                <div 
+                  key={i} 
+                  className={`absolute top-0 text-[11px] font-medium ${isBusinessHour ? 'text-gray-600' : 'text-gray-400'}`}
+                  style={{ left: `${getPos(time)}%` }}
+                >
+                  {time.getHours().toString().padStart(2, '0')}:00
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Fixed Status Column Header */}
+        <div className="w-32 flex-shrink-0 px-3 py-2 border-l border-gray-200 bg-gray-50 text-right">
+          <span className="text-xs font-semibold text-gray-600 uppercase">Status</span>
+        </div>
       </div>
+
+      {/* Workers Rows with Sticky Columns */}
+      <div className="space-y-0 relative">
+        {logs.map((log, idx) => {
+          const schedLeft = getPos(log.scheduledStart);
+          const schedWidth = getPos(log.scheduledEnd) - schedLeft;
+          const actualStart = log.actualStart || log.scheduledStart;
+          const actualEnd = log.actualEnd || (isToday ? now : log.scheduledEnd);
+          const isLive = !log.actualEnd && isToday;
+          
+          const actualLeft = getPos(actualStart);
+          const actualWidth = Math.max(0.5, getPos(actualEnd) - actualLeft);
+
+          // Enhanced status colors matching the screenshot
+          let barColor = 'bg-blue-500';
+          let statusText = 'Done';
+          let statusColor = 'text-gray-700';
+          let timeText = '';
+          
+          if (isLive) {
+            barColor = 'bg-green-500';
+            statusText = 'Active';
+            statusColor = 'text-green-600';
+            timeText = `${formatTime(actualStart)} - ...`;
+          } else if (log.status === LogStatus.APPROVED) {
+            barColor = 'bg-blue-500';
+            statusText = 'Done';
+            statusColor = 'text-gray-700';
+            timeText = `${formatTime(actualStart)} - ${formatTime(actualEnd)}`;
+          } else {
+            barColor = 'bg-amber-500';
+            statusText = 'Pending';
+            statusColor = 'text-amber-600';
+            timeText = log.actualStart ? `${formatTime(actualStart)} - ${log.actualEnd ? formatTime(actualEnd) : 'Now'}` : '--';
+          }
+
+          const isHovered = hoveredLog === log.id;
+          
+          // Generate initials for avatar
+          const initials = log.workerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          const avatarColors = ['bg-indigo-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'];
+          const avatarColor = avatarColors[idx % avatarColors.length];
+
+          return (
+            <div 
+              key={log.id} 
+              className="group relative flex border-b border-gray-100 hover:bg-gray-50/50 transition-colors"
+            >
+              {/* Fixed Worker Info Column */}
+              <div className="w-44 flex-shrink-0 flex items-center gap-2 px-3 py-3 border-r border-gray-100 bg-white">
+                <div className={`w-8 h-8 ${avatarColor} rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0`}>
+                  {initials}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{log.workerName}</p>
+                  <p className="text-xs text-gray-500 truncate">{log.role}</p>
+                </div>
+              </div>
+              
+              {/* Scrollable Timeline Column */}
+              <div 
+                ref={(el) => {
+                  if (el) {
+                    rowScrollRefs.current.set(log.id, el);
+                  } else {
+                    rowScrollRefs.current.delete(log.id);
+                  }
+                }}
+                className="flex-1 overflow-x-auto" 
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                onScroll={(e) => handleScroll(e, log.id)}
+              >
+                <div className="min-w-[1200px] relative h-12 px-4">
+                  {/* Background with business hours highlight */}
+                  <div className="absolute inset-0 flex">
+                    <div className="bg-gray-50" style={{ width: `${(8/24) * 100}%` }}></div>
+                    <div className="bg-white" style={{ width: `${(10/24) * 100}%` }}></div>
+                    <div className="bg-gray-50" style={{ width: `${(6/24) * 100}%` }}></div>
+                  </div>
+
+                  {/* Vertical grid lines */}
+                  {markers.map((time, i) => {
+                    const isBusinessHour = time.getHours() >= 8 && time.getHours() < 18;
+                    return (
+                      <div 
+                        key={i} 
+                        className={`absolute top-0 bottom-0 border-l ${isBusinessHour ? 'border-gray-200' : 'border-gray-100'}`}
+                        style={{ left: `${getPos(time)}%` }}
+                      ></div>
+                    );
+                  })}
+
+                  {/* Scheduled Bar (Background) */}
+                  <div 
+                    className="absolute top-1/2 -translate-y-1/2 h-3 bg-gray-200 rounded-md opacity-40"
+                    style={{ left: `${schedLeft}%`, width: `${schedWidth}%` }}
+                  ></div>
+
+                  {/* Actual Bar (Foreground) */}
+                  {log.actualStart && (
+                    <div 
+                      className={`absolute top-1/2 -translate-y-1/2 h-4 rounded-md ${barColor} transition-all duration-300 shadow-sm ${
+                        isHovered ? 'shadow-md scale-y-110' : ''
+                      }`}
+                      style={{ left: `${actualLeft}%`, width: `${actualWidth}%` }}
+                    >
+                      {/* Tooltip on hover */}
+                      {isHovered && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-50 pointer-events-none">
+                          <div className="font-semibold">{log.workerName}</div>
+                          <div className="text-gray-300 text-[10px] mt-1">
+                            Scheduled: {formatTime(log.scheduledStart)} - {formatTime(log.scheduledEnd)}
+                          </div>
+                          <div className="text-gray-300 text-[10px]">
+                            Actual: {log.actualStart ? formatTime(log.actualStart) : '--'} - {log.actualEnd ? formatTime(log.actualEnd) : 'Ongoing'}
+                          </div>
+                          <div className="text-gray-300 text-[10px] font-semibold">
+                            Duration: {calculateDuration(actualStart, log.actualEnd)}
+                          </div>
+                          {log.notes && <div className="text-gray-400 text-[10px] italic mt-1">"{log.notes}"</div>}
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Fixed Status Column */}
+              <div className="w-32 flex-shrink-0 flex flex-col justify-center text-right px-3 py-3 border-l border-gray-100 bg-white">
+                <div className={`text-sm font-semibold ${statusColor} mb-0.5`}>
+                  {statusText}
+                </div>
+                <div className="text-[11px] text-gray-500">
+                  {timeText}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Current Time Indicator - Synchronized with scroll, contained within Gantt chart */}
+      {isToday && currentPos >= 0 && currentPos <= 100 && (
+        <div 
+          className="absolute top-10 bottom-0 pointer-events-none z-40"
+          style={{ 
+            left: '176px', 
+            right: '128px',
+            overflow: 'hidden'
+          }}
+        >
+          <div 
+            className="relative h-full"
+            style={{ 
+              transform: `translateX(-${scrollLeft}px)`,
+              width: '1200px'
+            }}
+          >
+            <div 
+              className="absolute top-0 bottom-0 w-px bg-red-500"
+              style={{ left: `${currentPos}%` }}
+            >
+              <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap">
+                Now
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -202,12 +380,27 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
              d.getFullYear() === now.getFullYear();
   };
 
-  // Filter logs for selected Date
+  // Filter logs for selected Date AND current project
   const displayLogs = logs.filter(l => 
+    String(l.projectId) === String(project.id) &&
     l.scheduledStart.getDate() === currentDate.getDate() && 
     l.scheduledStart.getMonth() === currentDate.getMonth() &&
     l.scheduledStart.getFullYear() === currentDate.getFullYear()
   );
+  
+  console.log('ProjectDetail - Project ID:', project.id, 'Type:', typeof project.id);
+  console.log('ProjectDetail - Current Date:', currentDate.toISOString().split('T')[0]);
+  console.log('ProjectDetail - Total logs:', logs.length);
+  console.log('ProjectDetail - Filtered logs for this project (all dates):', logs.filter(l => String(l.projectId) === String(project.id)).length);
+  console.log('ProjectDetail - Filtered logs for this date (all projects):', logs.filter(l => 
+    l.scheduledStart.getDate() === currentDate.getDate() && 
+    l.scheduledStart.getMonth() === currentDate.getMonth() &&
+    l.scheduledStart.getFullYear() === currentDate.getFullYear()
+  ).length);
+  console.log('ProjectDetail - Filtered logs (project + date):', displayLogs.length);
+  if (displayLogs.length > 0) {
+    console.log('ProjectDetail - Sample filtered log:', displayLogs[0]);
+  }
 
   // Financial Data Mockup
   const financeData = [
@@ -456,7 +649,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
                                 <div>
                                     <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
                                     <div className="flex gap-2 mt-2 flex-wrap">
-                                        {project.tags.map(tag => (
+                                        {project.tags?.map(tag => (
                                             <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
                                                 {tag}
                                             </span>
