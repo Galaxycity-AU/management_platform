@@ -232,6 +232,8 @@ function App() {
     { name: 'Planning', value: projects.filter(p => p.status === ProjectStatus.PLANNING).length },
   ];
 
+  const projectAlerts = projects;
+
   // Handlers
   const handleApproveLog = (id: string, adjustedStart?: Date, adjustedEnd?: Date, reason?: string) => {
     setLogs(prev => prev.map(l => {
@@ -448,7 +450,7 @@ function App() {
               {/* Dashboard View */}
               {currentView === View.DASHBOARD && (
                 <div className="max-w-7xl mx-auto">
-                  <DashboardStatsView stats={stats} projectStatusData={projectStatusData} />
+                  <DashboardStatsView stats={stats} projectStatusData={projectStatusData} projectAlerts={projectAlerts} />
 
                   {stats.delayedProjects > 0 && (
                     <div className="mt-8">

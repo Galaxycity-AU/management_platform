@@ -9,11 +9,20 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const db = mysql.createPool({
-    database: process.env.DATABASE_NAME,
-    user: process.env.SQL_USER,
-    password: process.env.SQL_PASSWORD,
-    host: process.env.SQL_HOST,
-    port: process.env.SQL_PORT ? Number(process.env.SQL_PORT) : 3306,
+//     database: process.env.DATABASE_NAME,
+//     user: process.env.SQL_USER,
+//     password: process.env.SQL_PASSWORD,
+//     host: process.env.SQL_HOST,
+//     port: process.env.SQL_PORT ? Number(process.env.SQL_PORT) : 3306,
+//     waitForConnections: true,
+//     connectionLimit: 10,
+//     queueLimit: 0
+// }) || mysql.createPool({
+    database: 'pm_local_mock',
+    user: 'root',
+    password: '',
+    host: '127.0.0.1',
+    port: 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0

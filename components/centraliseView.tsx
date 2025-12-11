@@ -385,7 +385,7 @@ const CentraliseView = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-white">
+    <div className="h-screen flex flex-col bg-white mt-4">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200">
         <div className="flex items-center gap-4">
