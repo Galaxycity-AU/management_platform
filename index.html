@@ -26,6 +26,16 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #a1a1aa; 
       }
+      
+      /* Blinking animation for alert icons */
+      .blinking-icon {
+        animation: blink 1s steps(2, start) infinite;
+      }
+      @keyframes blink {
+        to {
+          visibility: hidden;
+        }
+      }
     </style>
   <script type="importmap">
 {
