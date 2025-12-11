@@ -150,10 +150,11 @@ async function main() {
         actualEnd = new Date(scheduledEnd.getTime() + randInt(-60, 120) * 60000);
       }
 
-      // Sometimes jobs get rescheduled (20% chance)
+      // Store modified times if job gets rescheduled (will be moved to approval)
       let modifiedStart = null;
       let modifiedEnd = null;
-      if (Math.random() < 0.2) {
+      const hasModifiedTimes = Math.random() < 0.2;
+      if (hasModifiedTimes) {
         // Modified time is 1-3 days different from scheduled
         modifiedStart = new Date(scheduledStart.getTime() + randInt(-3, 3) * 86400000);
         modifiedStart.setHours(randInt(6, 10), randInt(0, 59), 0, 0);
@@ -163,8 +164,8 @@ async function main() {
       const [result] = await db.query(
         `INSERT INTO jobs 
          (project_id, worker_id, status, scheduled_start, scheduled_end, 
-          actual_start, actual_end, modified_start, modified_end)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          actual_start, actual_end, approval_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           project.id,
           worker.id,
@@ -173,24 +174,62 @@ async function main() {
           scheduledEnd,
           actualStart,
           actualEnd,
-          modifiedStart,
-          modifiedEnd
+          null // approval_id will be set when approval is created
         ]
       );
 
-      jobs.push({ id: result.insertId, projectId: project.id, workerId: worker.id });
+      jobs.push({ 
+        id: result.insertId, 
+        projectId: project.id, 
+        workerId: worker.id,
+        status: status,
+        modifiedStart,
+        modifiedEnd
+      });
+      
+      // If status is 'waiting_approval', automatically create an approval with only job_id (approver_id is NULL)
+      if (status === 'waiting_approval') {
+        const [approvalResult] = await db.query(
+          `INSERT INTO approvals (job_id, approver_id, comments, modified_start, modified_end)
+           VALUES (?, NULL, NULL, NULL, NULL)`,
+          [result.insertId]
+        );
+        
+        // Link the job to the approval
+        await db.query(
+          `UPDATE jobs SET approval_id = ? WHERE id = ?`,
+          [approvalResult.insertId, result.insertId]
+        );
+      }
     }
     console.log(`Jobs created: ${jobs.length}`);
 
     // -------------------------------
-    // APPROVALS (Simplified - just approver and comments)
+    // APPROVALS (with modified_start/modified_end)
     // -------------------------------
     console.log("Creating approvals...");
     let approvalCount = 0;
     
-    // Create approvals for about 60% of jobs
+    // Create approvals for jobs that need them
     for (const job of jobs) {
-      if (Math.random() < 0.6) {
+      // Skip if already has approval (waiting_approval jobs already have one)
+      const [existingApproval] = await db.query(
+        'SELECT id FROM approvals WHERE job_id = ?',
+        [job.id]
+      );
+      
+      if (existingApproval.length > 0) {
+        continue; // Already has approval
+      }
+      
+      // Create approval if job has modified times OR if it's approved/rejected status
+      // Skip schedule, active, and waiting_approval as they already have approvals created above
+      const needsApproval = job.modifiedStart !== null || 
+                           job.modifiedEnd !== null ||
+                           job.status === 'approved' ||
+                           job.status === 'rejected';
+      
+      if (needsApproval) {
         const approver = workers[randInt(0, workers.length - 1)];
         
         // Make sure approver is not the same as worker
@@ -209,15 +248,24 @@ async function main() {
           `Resources confirmed - ${finalApprover.name}`
         ];
 
-        await db.query(
-          `INSERT INTO approvals (job_id, approver_id, comments)
-           VALUES (?, ?, ?)`,
+        const [approvalResult] = await db.query(
+          `INSERT INTO approvals (job_id, approver_id, comments, modified_start, modified_end)
+           VALUES (?, ?, ?, ?, ?)`,
           [
             job.id,
             finalApprover.id,
-            commentTemplates[randInt(0, commentTemplates.length - 1)]
+            commentTemplates[randInt(0, commentTemplates.length - 1)],
+            job.modifiedStart,
+            job.modifiedEnd
           ]
         );
+        
+        // Link job to approval
+        await db.query(
+          `UPDATE jobs SET approval_id = ? WHERE id = ?`,
+          [approvalResult.insertId, job.id]
+        );
+        
         approvalCount++;
       }
     }
