@@ -43,6 +43,32 @@ const CentraliseView = () => {
     return durationMs / (1000 * 60 * 60); // Convert milliseconds to hours
   };
 
+  // Generate a consistent color for each project based on project ID
+  const getProjectColor = (projectId: number): string => {
+    // Predefined color palette with good contrast
+    const colorPalette = [
+      '#818cf8', // indigo
+      '#fbbf24', // amber
+      '#34d399', // emerald
+      '#f87171', // red
+      '#60a5fa', // blue
+      '#a78bfa', // violet
+      '#fb7185', // rose
+      '#4ade80', // green
+      '#fbbf24', // yellow
+      '#38bdf8', // sky
+      '#c084fc', // purple
+      '#fb923c', // orange
+      '#22d3ee', // cyan
+      '#f472b6', // pink
+      '#84cc16', // lime
+      '#94a3b8', // slate
+    ];
+    
+    // Use modulo to cycle through colors based on project ID
+    return colorPalette[projectId % colorPalette.length];
+  };
+
   // Data loading function
   const loadData = useCallback(async () => {
     try {
@@ -94,8 +120,8 @@ const CentraliseView = () => {
       const transformedJobs = jobsData
         .filter((job: any) => {
           // Use scheduled_start or modified_start or actual_start
-          const startTime = job.actual_start || job.modified_start || job.scheduled_start;
-          const endTime = job.actual_end || job.modified_end || job.scheduled_end;
+          const startTime =  job.scheduled_start;
+          const endTime = job.scheduled_end;
           return startTime && endTime; // Only include jobs with valid time data
         })
         .map((job: any) => {
@@ -103,8 +129,8 @@ const CentraliseView = () => {
           const projectName = project?.name || `Project ${job.project_id}`;
           
           // Use the most relevant times (actual > modified > scheduled)
-          const startDatetime = job.actual_start || job.modified_start || job.scheduled_start;
-          const endDatetime = job.actual_end || job.modified_end || job.scheduled_end;
+          const startDatetime =  job.scheduled_start;
+          const endDatetime =  job.scheduled_end;
           
           const startHour = parseTimeToHours(startDatetime);
           const duration = calculateDuration(startDatetime, endDatetime);
@@ -118,21 +144,8 @@ const CentraliseView = () => {
           // Skip invalid dates
           if (isNaN(jobDate.getTime())) return null;
           
-          // Generate color based on job status
-          // Handle both nested (Status.Name) and flat (status) structures
-          const statusName = job.Status?.Name || job.status || 'unknown';
-          const statusColors: Record<string, string> = {
-            'scheduled': '#818cf8',
-            'in_progress': '#fbbf24',
-            'completed': '#34d399',
-            'cancelled': '#ef4444',
-            'on_hold': '#9ca3af',
-            'Onsite': '#fbbf24',
-            'Break': '#9ca3af',
-            'End Of Day': '#34d399',
-            'Completed': '#34d399'
-          };
-          const color = statusColors[statusName] || '#67e8f9';
+          // Generate color based on project ID (each project gets a consistent color)
+          const color = getProjectColor(job.project_id);
 
           return {
             id: job.id,
@@ -224,6 +237,24 @@ const CentraliseView = () => {
     return scheduledJobs.filter(job => 
       job.resourceId === resourceId && isSameDay(job.date, selectedDate)
     );
+  };
+
+  // Get filtered resources based on showAll checkbox
+  // When showAll is true, only show workers with jobs on the selected date
+  // When showAll is false, show all workers
+  const getFilteredResources = () => {
+    if (showAll) {
+      // Only show workers who have jobs on the selected date
+      const workersWithJobs = new Set(
+        scheduledJobs
+          .filter(job => isSameDay(job.date, selectedDate))
+          .map(job => job.resourceId)
+      );
+      return resources.filter(resource => workersWithJobs.has(resource.id));
+    } else {
+      // Show all workers
+      return resources;
+    }
   };
 
   const calculateJobPosition = (startHour) => {
@@ -392,10 +423,6 @@ const CentraliseView = () => {
           >
             TOMORROW
           </button>
-          <button className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            FILTER
-          </button>
         </div>
       </div>
 
@@ -447,7 +474,7 @@ const CentraliseView = () => {
                   onChange={(e) => setShowAll(e.target.checked)}
                   className="rounded"
                 />
-                Show All
+                Show Schedules
               </label>
             </div>
           </div>
@@ -463,7 +490,7 @@ const CentraliseView = () => {
                 display: none;
               }
             `}</style>
-            {resources.map((resource, index) => (
+            {getFilteredResources().map((resource, index) => (
               <div
                 key={resource.id}
                 className="flex items-center justify-between px-4 hover:bg-gray-100 cursor-pointer bg-white"
@@ -476,7 +503,6 @@ const CentraliseView = () => {
                 }}
               >
                 <div className="flex items-center gap-2">
-                  <input type="checkbox" className="rounded" />
                   <div className="w-2 h-2 rounded-full bg-green-500"></div>
                   <span className="text-sm text-blue-600 hover:underline">
                     {resource.name}
@@ -528,7 +554,7 @@ const CentraliseView = () => {
             ref={scheduleGridScrollRef}
             className="flex-1 overflow-y-auto overflow-x-hidden"
           >
-            {resources.map((resource, index) => (
+            {getFilteredResources().map((resource, index) => (
               <div 
                 key={resource.id} 
                 className="bg-white"
