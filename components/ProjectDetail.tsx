@@ -127,9 +127,10 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
                     const schedLeft = getPos(log.scheduledStart);
                     const schedWidth = getPos(log.scheduledEnd) - schedLeft;
                     const actualStart = log.actualStart || log.scheduledStart;
-                    const isLive = !log.actualEnd && isToday && log.status === LogStatus.ACTIVE;
-                    // For active status, extend to current time; otherwise use actual end or scheduled end
-                    const actualEnd = log.actualEnd || (isLive ? now : log.scheduledEnd);
+                    // A shift is "live" if it's ACTIVE status and has no actual end time (regardless of start date)
+                    const isLive = !log.actualEnd && log.status === LogStatus.ACTIVE;
+                    // For active status, extend to current time if viewing today; otherwise use scheduled end
+                    const actualEnd = log.actualEnd || (isLive && isToday ? now : log.scheduledEnd);
 
                     const actualLeft = getPos(actualStart);
                     const actualWidth = Math.max(0.5, getPos(actualEnd) - actualLeft);
@@ -140,6 +141,7 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
                     let statusColor = 'text-gray-700';
                     let timeText = '';
 
+                    console.log('Log Status Check:', log.workerName, log.status, { isLive, actualStart, actualEnd });
                     if (isLive) {
                         barColor = 'bg-green-300';
                         statusText = 'Active';
@@ -168,17 +170,48 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
                     const avatarColors = ['bg-indigo-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'];
                     const avatarColor = avatarColors[idx % avatarColors.length];
 
-                    // Null-safe checks for alerts (avoid calling getTime() on null)
-                    const dayIsToday = log.scheduledStart.getDate() - now.getDate() === 0 &&
-                        log.scheduledStart.getMonth() === now.getMonth() &&
-                        log.scheduledStart.getFullYear() === now.getFullYear();
+                    // Alert detection logic
                     const threshold = 10 * 60 * 1000; // 10 minutes
-                    const overdueScheduled = (now.getTime() - log.scheduledStart.getTime() > threshold) && (log.status === LogStatus.SCHEDULE || log.status === LogStatus.ACTIVE);
-                    const overdueEndActive = (now.getTime() - log.scheduledEnd.getTime() > threshold) && log.status === LogStatus.ACTIVE;
-                    const actualStartLate = !!(log.actualStart && (log.actualStart.getTime() - log.scheduledStart.getTime() > threshold) && log.status === LogStatus.WAITING_APPROVAL);
-                    const actualEndLate = !!(log.actualEnd && (log.actualEnd.getTime() - log.scheduledEnd.getTime() > threshold) && log.status === LogStatus.WAITING_APPROVAL);
-                    const historicalAlert = log.actualEnd != null && (actualStartLate || actualEndLate);
-                    const showAlert = dayIsToday ? (overdueScheduled || overdueEndActive || actualStartLate || actualEndLate) : historicalAlert;
+                    
+                    // Check if the scheduled start date is today or in the past
+                    const schedStartDate = new Date(log.scheduledStart);
+                    schedStartDate.setHours(0, 0, 0, 0);
+                    const todayDate = new Date(now);
+                    todayDate.setHours(0, 0, 0, 0);
+                    const isScheduledTodayOrPast = schedStartDate <= todayDate;
+                    
+                    // 1. Shift not started yet but past scheduled start time (overdue to start)
+                    const overdueScheduled = isScheduledTodayOrPast && !log.actualStart && 
+                                           (now.getTime() - log.scheduledStart.getTime() > threshold) &&
+                                           log.status === LogStatus.SCHEDULE;
+                    
+                    // 2. Shift started late (actual start is after scheduled start + threshold)
+                    const actualStartLate = log.actualStart != null && 
+                                          (log.actualStart.getTime() - log.scheduledStart.getTime() > threshold);
+                    
+                    // 3. Shift is ACTIVE but exceeded scheduled end time (overtime - this is the key fix)
+                    const overdueEndActive = log.status === LogStatus.ACTIVE && 
+                                           !log.actualEnd && 
+                                           (now.getTime() - log.scheduledEnd.getTime() > threshold);
+                    
+                    // 4. Shift ended late (actual end is after scheduled end + threshold)
+                    const actualEndLate = log.actualEnd != null && 
+                                        (log.actualEnd.getTime() - log.scheduledEnd.getTime() > threshold);
+                    
+                    // Show alert for any of these conditions
+                    const showAlert = (log.status === LogStatus.ACTIVE|| log.status === LogStatus.SCHEDULE || log.status === LogStatus.WAITING_APPROVAL) && (overdueScheduled || actualStartLate || overdueEndActive || actualEndLate);
+                    
+                    console.log('Log Alert Check:', log.workerName, { 
+                        isScheduledTodayOrPast,
+                        overdueScheduled, 
+                        actualStartLate, 
+                        overdueEndActive, 
+                        actualEndLate, 
+                        showAlert,
+                        isLive,
+                        scheduledEnd: log.scheduledEnd,
+                        now: now
+                    });
                     return (
                         <div
                             key={log.id}

@@ -84,24 +84,24 @@ function App() {
     try {
       // Use the correct API base URL with port
       const apiBaseUrl = 'http://localhost:3001'; // Adjust port as needed
-      
+
       console.log('Fetching projects from:', `${apiBaseUrl}/projects`);
       const fetchProjects = await fetch(`${apiBaseUrl}/projects`);
-      
+
       if (!fetchProjects.ok) {
         throw new Error(`HTTP error! status: ${fetchProjects.status}`);
       }
-      
+
       const projectsData = await fetchProjects.json();
       console.log('Projects fetched:', projectsData);
 
       // Safe date converter
-        const toSafeDate = (d: any): Date | null => {
-          if (d == null) return null;
-          if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
-          const parsed = new Date(d);
-          return isNaN(parsed.getTime()) ? null : parsed;
-        };
+      const toSafeDate = (d: any): Date | null => {
+        if (d == null) return null;
+        if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      };
 
       // Transform the data from new schema
       const projectData: Project[] = projectsData.map((p: any) => ({
@@ -121,20 +121,20 @@ function App() {
           fetch(`${apiBaseUrl}/jobs`),
           fetch(`${apiBaseUrl}/workers`)
         ]);
-        
+
         if (fetchJobs.ok && fetchWorkers.ok) {
           const jobsData = await fetchJobs.json();
           const workersData = await fetchWorkers.json();
-          
+
           console.log('Jobs data:', jobsData.length, 'jobs');
           console.log('Workers data:', workersData.length, 'workers');
-          
+
           // Create a map of workers for quick lookup
           const workersMap = new Map(workersData.map((w: any) => [w.id, w]));
-          
+
           // Create a map of projects for quick lookup
           const projectsMap = new Map(projectData.map((p: Project) => [Number(p.id), p]));
-          
+
           // Transform jobs into WorkerLog format
           const logsData: WorkerLog[] = jobsData
             .filter((job: any) => {
@@ -146,21 +146,21 @@ function App() {
             .map((job: any) => {
               const worker: any = workersMap.get(job.worker_id);
               const project = projectsMap.get(job.project_id);
-              
+
               // Determine which times to use (prioritize actual > modified > scheduled)
               const scheduledStart = new Date(job.scheduled_start);
               const scheduledEnd = new Date(job.scheduled_end);
               const actualStart = job.actual_start ? new Date(job.actual_start) : null;
               const actualEnd = job.actual_end ? new Date(job.actual_end) : null;
-              
+
               // Map job status to LogStatus
               const logStatus = job.status === 'schedule' ? LogStatus.SCHEDULE :
-                               job.status === 'active' ? LogStatus.ACTIVE :
-                               job.status === 'approved' ? LogStatus.APPROVED :
-                               job.status === 'rejected' ? LogStatus.REJECTED :
-                               job.status === 'waiting_approval' ? LogStatus.WAITING_APPROVAL :
-                               LogStatus.SCHEDULE;
-              
+                job.status === 'active' ? LogStatus.ACTIVE :
+                  job.status === 'approved' ? LogStatus.APPROVED :
+                    job.status === 'rejected' ? LogStatus.REJECTED :
+                      job.status === 'waiting_approval' ? LogStatus.WAITING_APPROVAL :
+                        LogStatus.SCHEDULE;
+
               return {
                 id: String(job.id),
                 workerName: worker?.name || 'Unknown Worker',
@@ -180,23 +180,23 @@ function App() {
                 approvedBy: actualEnd ? 'System' : undefined
               };
             });
-          
+
           console.log('Transformed logs:', logsData.length, 'logs');
           console.log('Sample log:', logsData[0]);
           setLogs(logsData);
-          
+
           // Calculate progress for each project based on approved jobs
           const updatedProjects = projectData.map(project => {
             const projectJobs = jobsData.filter((job: any) => job.project_id === project.id);
             const completedJobs = projectJobs.filter((job: any) => job.status === 'approved').length;
             const progress = projectJobs.length > 0 ? (completedJobs / projectJobs.length) * 100 : 0;
-            
+
             return {
               ...project,
               progress: Math.round(progress)
             };
           });
-          
+
           setProjects(updatedProjects);
         }
       } catch (jobError) {
@@ -232,7 +232,13 @@ function App() {
     { name: 'Planning', value: projects.filter(p => p.status === ProjectStatus.PLANNING).length },
   ];
 
-  const projectAlerts = projects;
+  const projectAlerts = projects.map(p => ({
+    ...p,
+    alerts: p.id % 2 === 0 ? true : false, // Dummy alert condition for example
+    lateCase: p.id % 2 === 0 ? p.id + p.id : 0, // Dummy reason
+    overTime: p.id % 3 === 0 ? p.id * 2 : 0, // Dummy reason
+    overBudget: p.id == 8 ? p.id * 3 : 0, // Dummy reason
+  })).filter(p => p.alerts);
 
   // Handlers
   const handleApproveLog = (id: string, adjustedStart?: Date, adjustedEnd?: Date, reason?: string) => {
@@ -450,7 +456,8 @@ function App() {
               {/* Dashboard View */}
               {currentView === View.DASHBOARD && (
                 <div className="max-w-7xl mx-auto">
-                  <DashboardStatsView stats={stats} projectStatusData={projectStatusData} projectAlerts={projectAlerts} />
+                  <DashboardStatsView stats={stats} projectStatusData={projectStatusData} projectAlerts={projectAlerts} onSelectProject={handleSelectProject}
+                  />
 
                   {stats.delayedProjects > 0 && (
                     <div className="mt-8">

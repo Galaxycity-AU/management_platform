@@ -17,7 +17,7 @@ interface Props {
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#9ca3af'];
 
-export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData, projectAlerts }) => {
+export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData, projectAlerts, onSelectProject }) => {
   return (
     <div className="space-y-6 mb-8">
       {/* Stats Grid */}
@@ -81,6 +81,8 @@ export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData, 
             <div
               key={index}
               className="flex items-center bg-gradient-to-r from-white to-red-50/30 shadow-sm hover:shadow-md transition-all rounded-lg border-l-4 border-red-500 p-4"
+              onClick={() => { onSelectProject(alert); }}
+              style={{ cursor: 'pointer' }}
             >
               <div className="mr-4 relative flex-shrink-0">
                 <AlertCircle className="w-6 h-6 text-red-500" />
@@ -100,14 +102,14 @@ export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData, 
                   </div>
                   <div className="mt-1">
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                      Late Case: {1} / Over Time: {2} / Over Budget: {- 9999}
+                      {alert.lateCase? `Late Case: ${alert.lateCase}` : ''} {alert.overTime? `| Over Time: ${alert.overTime}` : ''}{alert.overBudget? `| Over Budget` : ''}
                     </span>
                   </div>
                 </div>
                 
                 <div className="flex-shrink-0 ml-4">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                    {alert.id}
+                    {alert.lateCase + alert.overTime + (alert.overBudget? 1 : 0)} Alerts
                   </span>
                 </div>
               </div>
