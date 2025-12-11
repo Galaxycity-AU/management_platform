@@ -95,23 +95,21 @@ function App() {
       const projectsData = await fetchProjects.json();
       console.log('Projects fetched:', projectsData);
 
+      // Safe date converter
+        const toSafeDate = (d: any): Date | null => {
+          if (d == null) return null;
+          if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
+          const parsed = new Date(d);
+          return isNaN(parsed.getTime()) ? null : parsed;
+        };
+
       // Transform the data from new schema
       const projectData: Project[] = projectsData.map((p: any) => ({
-        id: p.id || p._id || String(Math.random()),
-        name: p.name || 'Unnamed Project',
-        client: truncateClientName(p.client || 'Unknown Client'),
-        scheduledStart: p.created_at ? new Date(p.created_at) : new Date(), // Use created_at as start date
-        scheduledEnd: p.deadline ? new Date(p.deadline) : new Date(), // Use deadline as end date
-        status: (p.status === 'active' ? ProjectStatus.ACTIVE : 
-                 p.status === 'completed' ? ProjectStatus.COMPLETED :
-                 p.status === 'planning' ? ProjectStatus.PLANNING : ProjectStatus.PLANNING),
-        budget: 0, // Budget not in current schema, defaulting to 0
-        spent: 0, // Spent not in current schema, defaulting to 0
-        progress: 0, // Progress not in current schema, will need to calculate from jobs
-        schedules: [],
-        team: [],
-        tags: [], // Tags not in current schema
-        description: p.description || '',
+        ...p,
+        deadline: toSafeDate(p.deadline),
+        spent: p.spent || 0,
+        budget: p.budget || 0,
+        progress: p.progress || 0,
       }));
 
       console.log('Transformed projects:', projectData);

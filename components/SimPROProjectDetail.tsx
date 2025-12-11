@@ -48,7 +48,7 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date; schedul
           scheduledEnd: endTime,
           actualStart: null,
           actualEnd: null,
-          status: LogStatus.PENDING,
+          status: LogStatus.WAITING_APPROVAL,
           isSchedule: true,
           scheduleData: schedule,
           blockData: block,
