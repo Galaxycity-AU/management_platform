@@ -232,7 +232,8 @@ function App() {
     { name: 'Planning', value: projects.filter(p => p.status === ProjectStatus.PLANNING).length },
   ];
 
-  const projectAlerts = projects;
+  const projectAlerts = projects.filter( p => 
+    p.id < 4);
 
   // Handlers
   const handleApproveLog = (id: string, adjustedStart?: Date, adjustedEnd?: Date, reason?: string) => {

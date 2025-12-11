@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Menu, Clock, Filter } from 'lucide-react';
 import { fetchWorkers, fetchJobs, fetchProjects } from '../utils/apiUtils';
-import DateSelector from './DateSelector';
 
 const CentraliseView = () => {
   const [blockHeight] = useState(1);
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [showAll, setShowAll] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const [resources, setResources] = useState<Array<{ id: number; name: string; hours: number }>>([]);
   const [scheduledJobs, setScheduledJobs] = useState<Array<{
     id: number;
@@ -20,19 +19,15 @@ const CentraliseView = () => {
     date: Date;
     color: string;
     type: string;
+    scheduledStart?: string;
+    actualStart?: string;
+    actualEnd?: string;
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const resourceListScrollRef = useRef(null);
   const scheduleGridScrollRef = useRef(null);
   const isScrollingRef = useRef(false);
-
-  // Helper function to parse datetime string to hours
-  const parseTimeToHours = (datetimeString: string): number => {
-    if (!datetimeString) return 0;
-    const date = new Date(datetimeString);
-    return date.getHours() + date.getMinutes() / 60;
-  };
 
   // Helper function to calculate duration in hours from start and end datetime
   const calculateDuration = (startDatetime: string, endDatetime: string): number => {
@@ -156,7 +151,10 @@ const CentraliseView = () => {
             duration: duration,
             date: jobDate,
             color: color,
-            type: 'job'
+            type: 'job',
+            scheduledStart: job.scheduled_start,
+            actualStart: job.actual_start || null,
+            actualEnd: job.actual_end || null
           };
         })
         .filter((job: any) => job !== null); // Remove null entries
@@ -222,6 +220,93 @@ const CentraliseView = () => {
     return isSameDay(date, selectedDate);
   };
 
+  const getJobsForResourceOnSelectedDate = (resourceId) => {
+    return scheduledJobs.filter(job => 
+      job.resourceId === resourceId && isSameDay(job.date, selectedDate)
+    );
+  };
+
+  const parseTimeToHours = (datetimeString) => {
+    if (!datetimeString) return 0;
+    const date = new Date(datetimeString);
+    return date.getHours() + date.getMinutes() / 60;
+  };
+
+  const getWorkerStatus = (resourceId) => {
+    const now = new Date();
+    const jobsToday = scheduledJobs.filter(job => 
+      job.resourceId === resourceId && isSameDay(job.date, selectedDate)
+    );
+
+    if (jobsToday.length === 0) {
+      return { status: 'no-job', label: 'No Jobs', color: 'bg-gray-400' };
+    }
+
+    if (!isToday(selectedDate)) {
+      return { status: 'scheduled', label: 'Scheduled', color: 'bg-blue-500' };
+    }
+
+    const currentHour = now.getHours() + now.getMinutes() / 60;
+    
+    const activeJob = jobsToday.find(job => job.actualStart && !job.actualEnd);
+    if (activeJob) {
+      const startTime = new Date(activeJob.actualStart);
+      const startTimeStr = startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return { 
+        status: 'in-progress', 
+        label: `Started ${startTimeStr}`, 
+        color: 'bg-green-500',
+        time: startTimeStr
+      };
+    }
+
+    const completedJob = jobsToday.find(job => job.actualStart && job.actualEnd);
+    if (completedJob) {
+      const endTime = new Date(completedJob.actualEnd);
+      const endTimeStr = endTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return { 
+        status: 'completed', 
+        label: `Ended ${endTimeStr}`, 
+        color: 'bg-gray-600',
+        time: endTimeStr
+      };
+    }
+
+    const lateJob = jobsToday.find(job => {
+      const scheduledStart = parseTimeToHours(job.scheduledStart);
+      return currentHour > scheduledStart + 0.25 && !job.actualStart;
+    });
+    
+    if (lateJob) {
+      const scheduledTime = new Date(lateJob.scheduledStart);
+      const scheduledTimeStr = scheduledTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return { 
+        status: 'late', 
+        label: `Late (${scheduledTimeStr})`, 
+        color: 'bg-red-500',
+        time: scheduledTimeStr
+      };
+    }
+
+    const upcomingJob = jobsToday.find(job => {
+      const scheduledStart = parseTimeToHours(job.scheduledStart);
+      return currentHour < scheduledStart;
+    });
+
+    if (upcomingJob) {
+      const scheduledTime = new Date(upcomingJob.scheduledStart);
+      const scheduledTimeStr = scheduledTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return { 
+        status: 'scheduled', 
+        label: `Starts ${scheduledTimeStr}`, 
+        color: 'bg-blue-500',
+        time: scheduledTimeStr
+      };
+    }
+
+    return { status: 'scheduled', label: 'Scheduled', color: 'bg-blue-500' };
+  };
+
   const timeSlots = [];
   for (let hour = 0; hour <= 23; hour++) {
     timeSlots.push(hour);
@@ -233,18 +318,8 @@ const CentraliseView = () => {
     return `${displayHour}${period}`;
   };
 
-  const getJobsForResourceOnSelectedDate = (resourceId) => {
-    return scheduledJobs.filter(job => 
-      job.resourceId === resourceId && isSameDay(job.date, selectedDate)
-    );
-  };
-
-  // Get filtered resources based on showAll checkbox
-  // When showAll is true, only show workers with jobs on the selected date
-  // When showAll is false, show all workers
   const getFilteredResources = () => {
     if (showAll) {
-      // Only show workers who have jobs on the selected date
       const workersWithJobs = new Set(
         scheduledJobs
           .filter(job => isSameDay(job.date, selectedDate))
@@ -252,7 +327,6 @@ const CentraliseView = () => {
       );
       return resources.filter(resource => workersWithJobs.has(resource.id));
     } else {
-      // Show all workers
       return resources;
     }
   };
@@ -309,7 +383,7 @@ const CentraliseView = () => {
 
 
   useEffect(() => {
-    // Wait for resources to load before setting up scroll synchronization
+    // Wait for resources to load and DOM to be ready
     if (loading || resources.length === 0) return;
 
     const resourceList = resourceListScrollRef.current;
@@ -342,9 +416,36 @@ const CentraliseView = () => {
       resourceList.removeEventListener('scroll', handleResourceScroll);
       scheduleGrid.removeEventListener('scroll', handleScheduleScroll);
     };
-  }, [loading, resources.length]);
+  }, [loading, resources.length, showAll, selectedDate]);
 
   const rowHeight = 60 * blockHeight;
+
+  // Format time for tooltip
+  const formatTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  // Calculate statistics
+  const getStatistics = () => {
+    const filteredRes = getFilteredResources();
+    const total = filteredRes.length;
+    let working = 0, late = 0, completed = 0, upcoming = 0, off = 0;
+    
+    filteredRes.forEach(resource => {
+      const status = getWorkerStatus(resource.id);
+      if (status.status === 'in-progress') working++;
+      else if (status.status === 'late') late++;
+      else if (status.status === 'completed') completed++;
+      else if (status.status === 'scheduled') upcoming++;
+      else if (status.status === 'no-job') off++;
+    });
+    
+    return { total, working, late, completed, upcoming, off };
+  };
+
+  const stats = getStatistics();
 
   if (loading) {
     return (
@@ -374,7 +475,7 @@ const CentraliseView = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-white mt-4">
+    <div className="h-screen flex flex-col bg-white">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200">
         <div className="flex items-center gap-4">
@@ -416,20 +517,58 @@ const CentraliseView = () => {
       </div>
 
       {/* Date Selector Strip */}
-      <DateSelector
-        dates={dates}
-        selectedDate={selectedDate}
-        onDateSelect={handleDateClick}
-        isToday={isToday}
-        getDayName={getDayName}
-        getDateNumber={getDateNumber}
-      />
+      <div className="border-b border-gray-200 bg-gray-50">
+        <style>{`
+          .date-scroll-container::-webkit-scrollbar {
+            height: 12px;
+            display: block;
+          }
+          .date-scroll-container::-webkit-scrollbar-track {
+            background: #f7fafc;
+            border-radius: 6px;
+          }
+          .date-scroll-container::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 6px;
+            border: 2px solid #f7fafc;
+          }
+          .date-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+          }
+        `}</style>
+        <div 
+          className="date-scroll-container overflow-x-auto"
+          style={{ 
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#cbd5e0 #f7fafc'
+          }}
+        >
+          <div className="flex">
+            {dates.map((date, index) => (
+              <button
+                key={index}
+                onClick={() => handleDateClick(date)}
+                className={`flex-shrink-0 w-16 text-center py-2 border-r border-gray-200 transition select-none hover:bg-gray-100 ${
+                  isSelectedDate(date)
+                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                    : isToday(date)
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'bg-white'
+                }`}
+              >
+                <div className="text-xs font-medium">{getDayName(date)}</div>
+                <div className="text-xl font-semibold">{getDateNumber(date)}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - Resources */}
         <div className="w-64 flex flex-col bg-gray-50 border-r border-gray-200">
-          {/* Filter Section - Same height as Time Header */}
+          {/* Filter Section */}
           <div 
             className="px-4 bg-white flex-shrink-0 flex items-center justify-between border-b border-gray-200" 
             style={{ 
@@ -441,7 +580,7 @@ const CentraliseView = () => {
           >
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-700">Individual Resources</span>
-              <label className="flex items-center gap-2 text-xxs text-gray-600 ml-2">
+              <label className="flex items-center gap-2 text-xs text-gray-600 ml-2">
                 <input
                   type="checkbox"
                   checked={showAll}
@@ -453,7 +592,7 @@ const CentraliseView = () => {
             </div>
           </div>
 
-          {/* Resource List with synchronized scroll */}
+          {/* Resource List */}
           <div 
             ref={resourceListScrollRef}
             className="flex-1 overflow-y-auto"
@@ -464,32 +603,32 @@ const CentraliseView = () => {
                 display: none;
               }
             `}</style>
-            {getFilteredResources().map((resource, index) => (
-              <div
-                key={resource.id}
-                className="flex items-center justify-between px-4 hover:bg-gray-100 cursor-pointer bg-white"
-                style={{ 
-                  height: `${rowHeight}px`, 
-                  minHeight: `${rowHeight}px`,
-                  maxHeight: `${rowHeight}px`,
-                  boxSizing: 'border-box',
-                  borderBottom: '1px solid #e5e7eb'
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                  <span className="text-sm text-blue-600 hover:underline">
+            {getFilteredResources().map((resource) => {
+              return (
+                <div
+                  key={resource.id}
+                  className="flex items-center px-4 hover:bg-gray-50 cursor-pointer bg-white"
+                  style={{ 
+                    height: `${rowHeight}px`, 
+                    minHeight: `${rowHeight}px`,
+                    maxHeight: `${rowHeight}px`,
+                    boxSizing: 'border-box',
+                    borderBottom: '1px solid #e5e7eb'
+                  }}
+                >
+                  {/* Worker Info */}
+                  <span className="text-sm font-semibold text-gray-900 truncate flex-1 min-w-0">
                     {resource.name}
                   </span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Schedule Grid - Single Day View */}
+        {/* Schedule Grid */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Time Header - Fixed position */}
+          {/* Time Header */}
           <div 
             className="bg-gray-50 relative flex-shrink-0"
             style={{ 
@@ -509,7 +648,6 @@ const CentraliseView = () => {
                   {hour % 2 === 0 && formatHour(hour)}
                 </div>
               ))}
-              {/* Current Time Indicator in Header */}
               {(() => {
                 const currentTimePos = getCurrentTimePosition();
                 if (currentTimePos === null) return null;
@@ -523,12 +661,12 @@ const CentraliseView = () => {
             </div>
           </div>
 
-          {/* Resource Rows - Scrollable */}
+          {/* Resource Rows */}
           <div 
             ref={scheduleGridScrollRef}
             className="overflow-y-auto overflow-x-hidden"
           >
-            {getFilteredResources().map((resource, index) => (
+            {getFilteredResources().map((resource) => (
               <div 
                 key={resource.id} 
                 className="bg-white"
@@ -551,7 +689,7 @@ const CentraliseView = () => {
                     ))}
                   </div>
 
-                  {/* Current Time Indicator - Red Line */}
+                  {/* Current Time Indicator */}
                   {(() => {
                     const currentTimePos = getCurrentTimePosition();
                     if (currentTimePos === null) return null;
@@ -564,23 +702,99 @@ const CentraliseView = () => {
                   })()}
 
                   {/* Scheduled Jobs */}
-                  {getJobsForResourceOnSelectedDate(resource.id).map((job) => (
-                    <div
-                      key={job.id}
-                      className="absolute top-1 bottom-1 rounded px-2 py-1 text-xs font-medium overflow-hidden cursor-pointer hover:opacity-90 transition shadow"
-                      style={{
-                        left: `${calculateJobPosition(job.startHour)}%`,
-                        width: `${calculateJobWidth(job.duration)}%`,
-                        backgroundColor: job.color,
-                        color: '#000'
-                      }}
-                    >
-                      <div className="font-semibold truncate">{job.resourceId} - {job.title}</div>
-                      {job.subtitle && (
-                        <div className="text-xs opacity-80 truncate mt-0.5">{job.subtitle}</div>
-                      )}
-                    </div>
-                  ))}
+                  {getJobsForResourceOnSelectedDate(resource.id).map((job) => {
+                    const now = new Date();
+                    const currentHour = now.getHours() + now.getMinutes() / 60;
+                    
+                    // Calculate actual progress
+                    let actualStartHour = null;
+                    let actualEndHour = null;
+                    let isLate = false;
+                    
+                    if (job.actualStart) {
+                      const actualStartDate = new Date(job.actualStart);
+                      actualStartHour = actualStartDate.getHours() + actualStartDate.getMinutes() / 60;
+                    }
+                    
+                    if (job.actualEnd) {
+                      const actualEndDate = new Date(job.actualEnd);
+                      actualEndHour = actualEndDate.getHours() + actualEndDate.getMinutes() / 60;
+                    }
+                    
+                    // Check if late (should have started but hasn't)
+                    if (!job.actualStart && isToday(selectedDate) && currentHour > job.startHour + 0.25) {
+                      isLate = true;
+                    }
+                    
+                    // Determine colors
+                    const baseColor = job.color;
+                    const lightColor = job.color + '30'; // Light for scheduled
+                    const darkColor = job.color; // Dark for actual
+                    const lateColor = '#fee2e2'; // Light red background for late
+                    const lateBorder = '#ef4444'; // Red border for late
+                    
+                    return (
+                      <div
+                        key={job.id}
+                        className="absolute top-1 bottom-1"
+                        style={{
+                          left: `${calculateJobPosition(job.startHour)}%`,
+                          width: `${calculateJobWidth(job.duration)}%`,
+                        }}
+                      >
+                        {/* Scheduled time bar (light color or red if late) */}
+                        <div
+                          className={`absolute inset-0 rounded px-2 py-1 text-xs font-medium overflow-hidden border-2 ${isLate ? 'animate-pulse' : ''}`}
+                          style={{
+                            backgroundColor: isLate ? lateColor : lightColor,
+                            borderColor: isLate ? lateBorder : darkColor,
+                            borderStyle: isLate ? 'dashed' : 'solid',
+                            color: '#000',
+                            animationDuration: isLate ? '1.5s' : undefined
+                          }}
+                        >
+                          <div className="font-semibold truncate relative z-10">{job.title}</div>
+                          {job.subtitle && (
+                            <div className="text-xs opacity-70 truncate mt-0.5 relative z-10">{job.subtitle}</div>
+                          )}
+                        </div>
+                        
+                        {/* Actual time worked bar (dark color) - overlays but keeps text visible */}
+                        {actualStartHour !== null && (
+                          <>
+                            <div
+                              className="absolute top-0 bottom-0 rounded shadow-sm"
+                              style={{
+                                backgroundColor: darkColor,
+                                opacity: 0.7,
+                                left: `${Math.max(0, ((actualStartHour - job.startHour) / job.duration) * 100)}%`,
+                                width: actualEndHour !== null 
+                                  ? `${((actualEndHour - actualStartHour) / job.duration) * 100}%`
+                                  : `${((currentHour - actualStartHour) / job.duration) * 100}%`,
+                                minWidth: '3px',
+                                pointerEvents: 'none'
+                              }}
+                            />
+                            
+                            {/* Subtle pulse for in-progress work */}
+                            {!job.actualEnd && isToday(selectedDate) && (
+                              <div
+                                className="absolute top-0 bottom-0 animate-pulse"
+                                style={{
+                                  backgroundColor: darkColor,
+                                  opacity: 0.2,
+                                  left: `${Math.max(0, ((actualStartHour - job.startHour) / job.duration) * 100)}%`,
+                                  width: `${((currentHour - actualStartHour) / job.duration) * 100}%`,
+                                  pointerEvents: 'none',
+                                  animationDuration: '2s'
+                                }}
+                              />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
