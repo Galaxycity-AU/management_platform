@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Menu, Clock, Filter } from 'lucide-react';
 import { fetchWorkers, fetchJobs, fetchProjects } from '../utils/apiUtils';
+import DateSelector from './DateSelector';
 
 const CentraliseView = () => {
   const [blockHeight] = useState(1);
@@ -22,7 +23,6 @@ const CentraliseView = () => {
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const dateScrollRef = useRef(null);
   const resourceListScrollRef = useRef(null);
   const scheduleGridScrollRef = useRef(null);
   const isScrollingRef = useRef(false);
@@ -307,17 +307,6 @@ const CentraliseView = () => {
     return currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  useEffect(() => {
-    if (dateScrollRef.current) {
-      const todayIndex = dates.findIndex(date => isToday(date));
-      if (todayIndex !== -1) {
-        const scrollPosition = todayIndex * 64 - dateScrollRef.current.clientWidth / 2 + 32;
-        dateScrollRef.current.scrollTo({ left: Math.max(0, scrollPosition), behavior: 'smooth' });
-      } else {
-        dateScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-      }
-    }
-  }, [dates, currentMonth]);
 
   useEffect(() => {
     // Wait for resources to load before setting up scroll synchronization
@@ -427,29 +416,14 @@ const CentraliseView = () => {
       </div>
 
       {/* Date Selector Strip */}
-      <div className="border-b border-gray-200 bg-gray-50">
-        <div 
-          ref={dateScrollRef}
-          className="overflow-x-auto" 
-          style={{ scrollbarWidth: 'thin' }}
-        >
-          <div className="flex">
-            {dates.map((date, idx) => (
-              <button
-                key={`${date.getTime()}-${idx}`}
-                onClick={() => handleDateClick(date)}
-                className={`flex-shrink-0 w-16 text-center py-2 border-r border-gray-200 transition cursor-pointer hover:bg-gray-100 ${
-                  isSelectedDate(date) ? 'bg-blue-500 text-white hover:bg-blue-600' : 
-                  isToday(date) ? 'bg-blue-100 text-blue-900' : 'bg-white'
-                }`}
-              >
-                <div className="text-xs font-medium">{getDayName(date)}</div>
-                <div className="text-xl font-semibold">{getDateNumber(date)}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <DateSelector
+        dates={dates}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateClick}
+        isToday={isToday}
+        getDayName={getDayName}
+        getDateNumber={getDateNumber}
+      />
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
@@ -552,7 +526,7 @@ const CentraliseView = () => {
           {/* Resource Rows - Scrollable */}
           <div 
             ref={scheduleGridScrollRef}
-            className="flex-1 overflow-y-auto overflow-x-hidden"
+            className="overflow-y-auto overflow-x-hidden"
           >
             {getFilteredResources().map((resource, index) => (
               <div 
