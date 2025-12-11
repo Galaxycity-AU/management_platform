@@ -145,7 +145,7 @@ const CentraliseView = () => {
           return {
             id: job.id,
             resourceId: job.worker_id,
-            title: `(${duration.toFixed(1)}HRS) ${projectName}`,
+            title: `(${duration.toFixed(1)}H) ${projectName}`,
             subtitle: project?.description || undefined,
             startHour: startHour,
             duration: duration,
@@ -730,7 +730,6 @@ const CentraliseView = () => {
                     const baseColor = job.color;
                     const lightColor = job.color + '30'; // Light for scheduled
                     const darkColor = job.color; // Dark for actual
-                    const lateColor = '#fee2e2'; // Light red background for late
                     const lateBorder = '#ef4444'; // Red border for late
                     
                     return (
@@ -742,11 +741,11 @@ const CentraliseView = () => {
                           width: `${calculateJobWidth(job.duration)}%`,
                         }}
                       >
-                        {/* Scheduled time bar (light color or red if late) */}
+                        {/* Scheduled time bar (project color with red border if late) */}
                         <div
                           className={`absolute inset-0 rounded px-2 py-1 text-xs font-medium overflow-hidden border-2 ${isLate ? 'animate-pulse' : ''}`}
                           style={{
-                            backgroundColor: isLate ? lateColor : lightColor,
+                            backgroundColor: lightColor,
                             borderColor: isLate ? lateBorder : darkColor,
                             borderStyle: isLate ? 'dashed' : 'solid',
                             color: '#000',
