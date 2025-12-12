@@ -237,53 +237,60 @@ const CentraliseView = () => {
     );
   };
 
+  // Get late reason for a specific job
+  const getJobLateReason = (job) => {
+    if (!job || !job.scheduledStart) return null;
+
+    const now = new Date();
+    const threshold = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+    const scheduledStart = new Date(job.scheduledStart);
+    const scheduledEnd = job.scheduledEnd ? new Date(job.scheduledEnd) : null;
+
+    // Check if the scheduled start date is today or in the past
+    const schedStartDate = new Date(scheduledStart);
+    schedStartDate.setHours(0, 0, 0, 0);
+    const todayDate = new Date(now);
+    todayDate.setHours(0, 0, 0, 0);
+    const isScheduledTodayOrPast = schedStartDate <= todayDate;
+
+    // 1. Shift not started yet but past scheduled start time (overdue to start)
+    const overdueScheduled = isScheduledTodayOrPast && 
+                             !job.actualStart && 
+                             (now.getTime() - scheduledStart.getTime() > threshold) &&
+                             (job.status === 'schedule' || !job.status);
+
+    // 2. Shift started late (actual start is after scheduled start + threshold)
+    const actualStartLate = job.actualStart != null && 
+                           (new Date(job.actualStart).getTime() - scheduledStart.getTime() > threshold);
+
+    // 3. Shift is active but exceeded scheduled end time (overtime)
+    const overdueEndActive = (job.status === 'active' || (job.actualStart && !job.actualEnd)) && 
+                             scheduledEnd != null &&
+                             !job.actualEnd && 
+                             (now.getTime() - scheduledEnd.getTime() > threshold);
+
+    // 4. Shift ended late (actual end is after scheduled end + threshold)
+    const actualEndLate = job.actualEnd != null && 
+                         scheduledEnd != null &&
+                         (new Date(job.actualEnd).getTime() - scheduledEnd.getTime() > threshold);
+
+    // Return the reason for the late condition
+    if (overdueScheduled) return 'Overdue Scheduled';
+    if (actualStartLate) return 'Actual Start Late';
+    if (overdueEndActive) return 'Overdue End Active';
+    if (actualEndLate) return 'Actual End Late';
+    
+    return null;
+  };
+
   // Check if a worker has any late conditions (comprehensive check)
   const hasLateConditions = (resourceId) => {
     const jobs = getJobsForResourceOnSelectedDate(resourceId);
     if (jobs.length === 0) return false;
 
-    const now = new Date();
-    const threshold = 10 * 60 * 1000; // 10 minutes in milliseconds
-
-    return jobs.some(job => {
-      if (!job.scheduledStart) return false;
-
-      const scheduledStart = new Date(job.scheduledStart);
-      const scheduledEnd = job.scheduledEnd ? new Date(job.scheduledEnd) : null;
-
-      // Check if the scheduled start date is today or in the past
-      const schedStartDate = new Date(scheduledStart);
-      schedStartDate.setHours(0, 0, 0, 0);
-      const todayDate = new Date(now);
-      todayDate.setHours(0, 0, 0, 0);
-      const isScheduledTodayOrPast = schedStartDate <= todayDate;
-
-      // 1. Shift not started yet but past scheduled start time (overdue to start)
-      const overdueScheduled = isScheduledTodayOrPast && 
-                               !job.actualStart && 
-                               (now.getTime() - scheduledStart.getTime() > threshold) &&
-                               (job.status === 'schedule' || !job.status);
-
-      // 2. Shift started late (actual start is after scheduled start + threshold)
-      const actualStartLate = job.actualStart != null && 
-                             (new Date(job.actualStart).getTime() - scheduledStart.getTime() > threshold);
-
-      // 3. Shift is active but exceeded scheduled end time (overtime)
-      const overdueEndActive = (job.status === 'active' || (job.actualStart && !job.actualEnd)) && 
-                               scheduledEnd != null &&
-                               !job.actualEnd && 
-                               (now.getTime() - scheduledEnd.getTime() > threshold);
-
-      // 4. Shift ended late (actual end is after scheduled end + threshold)
-      const actualEndLate = job.actualEnd != null && 
-                           scheduledEnd != null &&
-                           (new Date(job.actualEnd).getTime() - scheduledEnd.getTime() > threshold);
-
-      // Show alert for any of these conditions
-      return overdueScheduled || actualStartLate || overdueEndActive || actualEndLate;
-    });
+    return jobs.some(job => getJobLateReason(job) !== null);
   };
-
 
   const parseTimeToHours = (datetimeString) => {
     if (!datetimeString) return 0;
@@ -721,16 +728,16 @@ const CentraliseView = () => {
                   }}
                 >
                   {/* Worker Info */}
-                  <span className="text-sm font-semibold text-gray-900 truncate flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="flex items-center text-sm font-semibold text-gray-900 flex-1 min-w-0">
+                    <span className="truncate">{resource.name}</span>
+
                     {hasLateConditions(resource.id) && (
                       <TriangleAlert
-                        className="w-6 h-6 inline-block text-red-500 flex-shrink-0 animate-pulse"
+                        className="w-5 h-5 text-red-500 ml-auto animate-pulse"
                         aria-hidden="true"
-                        style={{ animationDuration: "1.5s" }}   // <-- direct duration here
+                        style={{ animationDuration: "1.5s" }}
                       />
                     )}
-
-                    {resource.name}
                   </span>
                 </div>
               );
@@ -918,6 +925,7 @@ const CentraliseView = () => {
           const worker = resources.find(resource => resource.id === selectedJob.resourceId);
           const jobStatus = getJobStatus(selectedJob);
           const projectName = selectedJob.title.replace(/^\(\d+\.\d+H\)\s/, '');
+          const lateReason = getJobLateReason(selectedJob);
           
           return (
             <div className="w-96 border-l border-gray-200 bg-white shadow-lg overflow-hidden flex flex-col">
@@ -935,8 +943,16 @@ const CentraliseView = () => {
                     </svg>
                   </button>
                 </div>
-                <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(jobStatus)}`}>
-                  {jobStatus}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(jobStatus)}`}>
+                    {jobStatus}
+                  </div>
+                  {lateReason && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-300">
+                      <TriangleAlert className="w-4 h-4" />
+                      <span>{lateReason}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
