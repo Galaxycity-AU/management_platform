@@ -241,6 +241,9 @@ const CentraliseView = () => {
   const getJobLateReason = (job) => {
     if (!job || !job.scheduledStart) return null;
 
+    // Don't show late condition if job is approved or rejected
+    if (job.status === 'approved' || job.status === 'rejected') return null;
+
     const now = new Date();
     const threshold = 10 * 60 * 1000; // 10 minutes in milliseconds
 
