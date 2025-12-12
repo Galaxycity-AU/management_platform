@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardStats } from '../types';
-import { Layers, Activity, AlertTriangle, Clock, AlertCircle } from 'lucide-react';
+import { Layers, Activity, AlertTriangle, Clock, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import CentraliseView from './centraliseView';
 
 interface Props {
@@ -18,6 +18,11 @@ interface Props {
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#9ca3af'];
 
 export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData, projectAlerts, onSelectProject }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const displayLimit = isExpanded ? 6 : 3;
+  const displayAlerts = projectAlerts.slice(0, displayLimit);
+  const hasMore = projectAlerts.length > displayLimit;
+
   return (
     <div className="space-y-6 mb-8">
       {/* Stats Grid */}
@@ -76,8 +81,15 @@ export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData, 
         </h3>
 
         {/* Alerts List - Full Width Bars */}
-        <div className="space-y-3">
-          {projectAlerts.map((alert, index) => (
+        <div 
+          className="space-y-3 overflow-y-auto transition-all duration-300"
+          style={{ 
+            maxHeight: isExpanded ? '600px' : '300px',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#ef4444 #fee2e2'
+          }}
+        >
+          {displayAlerts.map((alert, index) => (
             <div
               key={index}
               className="flex items-center bg-gradient-to-r from-white to-red-50/30 shadow-sm hover:shadow-md transition-all rounded-lg border-l-4 border-red-500 p-4"
@@ -109,13 +121,33 @@ export const DashboardStatsView: React.FC<Props> = ({ stats, projectStatusData, 
                 
                 <div className="flex-shrink-0 ml-4">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                    {alert.lateCase + alert.overTime + (alert.overBudget? 1 : 0)} Alerts
+                    {alert.lateCase + alert.overTime + (alert.overBudget? 1 : 0)}
                   </span>
                 </div>
               </div>
             </div>
           ))}
         </div>
+
+        {/* Expand/Collapse Button */}
+        {projectAlerts.length > 3 && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-200 border border-gray-200"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="w-4 h-4" />
+                Show Less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4" />
+                Show More ({projectAlerts.length - 3} more alerts)
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Centralized View Component */}
