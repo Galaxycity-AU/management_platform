@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Menu, Clock, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Menu, Clock, Filter, TriangleAlert } from 'lucide-react';
 import { fetchWorkers, fetchJobs, fetchProjects } from '../utils/apiUtils';
 
 const CentraliseView = () => {
@@ -8,10 +8,11 @@ const CentraliseView = () => {
   const [currentMonth, setCurrentMonth] = useState(today);
   const [selectedDate, setSelectedDate] = useState(today);
   const [showAll, setShowAll] = useState(false);
-  const [resources, setResources] = useState<Array<{ id: number; name: string; hours: number }>>([]);
+  const [resources, setResources] = useState<Array<{ id: number; name: string; hours: number; phone?: string; email?: string; position?: string }>>([]);
   const [scheduledJobs, setScheduledJobs] = useState<Array<{
     id: number;
     resourceId: number;
+    projectId: number;
     title: string;
     subtitle?: string;
     startHour: number;
@@ -20,14 +21,18 @@ const CentraliseView = () => {
     color: string;
     type: string;
     scheduledStart?: string;
+    scheduledEnd?: string;
     actualStart?: string;
     actualEnd?: string;
+    status?: string;
   }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const resourceListScrollRef = useRef(null);
   const scheduleGridScrollRef = useRef(null);
   const isScrollingRef = useRef(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+
 
   // Helper function to calculate duration in hours from start and end datetime
   const calculateDuration = (startDatetime: string, endDatetime: string): number => {
@@ -104,7 +109,10 @@ const CentraliseView = () => {
         return {
           id: worker.id,
           name: worker.name,
-          hours: totalHours
+          hours: totalHours,
+          phone: worker.phone || undefined,
+          email: worker.email || undefined,
+          position: worker.position || undefined
         };
       });
 
@@ -145,6 +153,7 @@ const CentraliseView = () => {
           return {
             id: job.id,
             resourceId: job.worker_id,
+            projectId: job.project_id,
             title: `(${duration.toFixed(1)}H) ${projectName}`,
             subtitle: project?.description || undefined,
             startHour: startHour,
@@ -153,8 +162,10 @@ const CentraliseView = () => {
             color: color,
             type: 'job',
             scheduledStart: job.scheduled_start,
+            scheduledEnd: job.scheduled_end,
             actualStart: job.actual_start || null,
-            actualEnd: job.actual_end || null
+            actualEnd: job.actual_end || null,
+            status: job.status
           };
         })
         .filter((job: any) => job !== null); // Remove null entries
@@ -224,6 +235,61 @@ const CentraliseView = () => {
     return scheduledJobs.filter(job => 
       job.resourceId === resourceId && isSameDay(job.date, selectedDate)
     );
+  };
+
+  // Get late reason for a specific job
+  const getJobLateReason = (job) => {
+    if (!job || !job.scheduledStart) return null;
+
+    const now = new Date();
+    const threshold = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+    const scheduledStart = new Date(job.scheduledStart);
+    const scheduledEnd = job.scheduledEnd ? new Date(job.scheduledEnd) : null;
+
+    // Check if the scheduled start date is today or in the past
+    const schedStartDate = new Date(scheduledStart);
+    schedStartDate.setHours(0, 0, 0, 0);
+    const todayDate = new Date(now);
+    todayDate.setHours(0, 0, 0, 0);
+    const isScheduledTodayOrPast = schedStartDate <= todayDate;
+
+    // 1. Shift not started yet but past scheduled start time (overdue to start)
+    const overdueScheduled = isScheduledTodayOrPast && 
+                             !job.actualStart && 
+                             (now.getTime() - scheduledStart.getTime() > threshold) &&
+                             (job.status === 'schedule' || !job.status);
+
+    // 2. Shift started late (actual start is after scheduled start + threshold)
+    const actualStartLate = job.actualStart != null && 
+                           (new Date(job.actualStart).getTime() - scheduledStart.getTime() > threshold);
+
+    // 3. Shift is active but exceeded scheduled end time (overtime)
+    const overdueEndActive = (job.status === 'active' || (job.actualStart && !job.actualEnd)) && 
+                             scheduledEnd != null &&
+                             !job.actualEnd && 
+                             (now.getTime() - scheduledEnd.getTime() > threshold);
+
+    // 4. Shift ended late (actual end is after scheduled end + threshold)
+    const actualEndLate = job.actualEnd != null && 
+                         scheduledEnd != null &&
+                         (new Date(job.actualEnd).getTime() - scheduledEnd.getTime() > threshold);
+
+    // Return the reason for the late condition
+    if (overdueScheduled) return 'Overdue Scheduled';
+    if (actualStartLate) return 'Actual Start Late';
+    if (overdueEndActive) return 'Overdue End Active';
+    if (actualEndLate) return 'Actual End Late';
+    
+    return null;
+  };
+
+  // Check if a worker has any late conditions (comprehensive check)
+  const hasLateConditions = (resourceId) => {
+    const jobs = getJobsForResourceOnSelectedDate(resourceId);
+    if (jobs.length === 0) return false;
+
+    return jobs.some(job => getJobLateReason(job) !== null);
   };
 
   const parseTimeToHours = (datetimeString) => {
@@ -427,6 +493,51 @@ const CentraliseView = () => {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  // Format date and time together
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    });
+  };
+
+  // Calculate job status: Done, In Progress, or Not Started
+  const getJobStatus = (job) => {
+    if (!job) return 'Not Started';
+    
+    // If job has both actual start and end, it's Done
+    if (job.actualStart && job.actualEnd) {
+      return 'Done';
+    }
+    
+    // If job has actual start but no end, it's In Progress
+    if (job.actualStart && !job.actualEnd) {
+      return 'In Progress';
+    }
+    
+    // Otherwise, it's Not Started
+    return 'Not Started';
+  };
+
+  // Get status badge color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Done':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'In Progress':
+        return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'Not Started':
+        return 'bg-red-100 text-red-800 border-red-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
   // Calculate statistics
   const getStatistics = () => {
     const filteredRes = getFilteredResources();
@@ -617,8 +728,16 @@ const CentraliseView = () => {
                   }}
                 >
                   {/* Worker Info */}
-                  <span className="text-sm font-semibold text-gray-900 truncate flex-1 min-w-0">
-                    {resource.name}
+                  <span className="flex items-center text-sm font-semibold text-gray-900 flex-1 min-w-0">
+                    <span className="truncate">{resource.name}</span>
+
+                    {hasLateConditions(resource.id) && (
+                      <TriangleAlert
+                        className="w-5 h-5 text-red-500 ml-auto animate-pulse"
+                        aria-hidden="true"
+                        style={{ animationDuration: "1.5s" }}
+                      />
+                    )}
                   </span>
                 </div>
               );
@@ -734,6 +853,7 @@ const CentraliseView = () => {
                     
                     return (
                       <div
+                        onClick={() => setSelectedJob(job)}
                         key={job.id}
                         className="absolute top-1 bottom-1"
                         style={{
@@ -753,9 +873,9 @@ const CentraliseView = () => {
                           }}
                         >
                           <div className="font-semibold truncate relative z-10">{job.title}</div>
-                          {job.subtitle && (
+                          {/* {job.subtitle && (
                             <div className="text-xs opacity-70 truncate mt-0.5 relative z-10">{job.subtitle}</div>
-                          )}
+                          )} */}
                         </div>
                         
                         {/* Actual time worked bar (dark color) - overlays but keeps text visible */}
@@ -799,6 +919,158 @@ const CentraliseView = () => {
             ))}
           </div>
         </div>
+
+        {/* RIGHT INFO PANEL - Only show when a schedule is clicked */}
+        {selectedJob && (() => {
+          const worker = resources.find(resource => resource.id === selectedJob.resourceId);
+          const jobStatus = getJobStatus(selectedJob);
+          const projectName = selectedJob.title.replace(/^\(\d+\.\d+H\)\s/, '');
+          const lateReason = getJobLateReason(selectedJob);
+          
+          return (
+            <div className="w-96 border-l border-gray-200 bg-white shadow-lg overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-5 flex-shrink-0">
+                <div className="flex items-start justify-between mb-3">
+                  <h2 className="text-xl font-bold">Job Details</h2>
+                  <button
+                    onClick={() => setSelectedJob(null)}
+                    className="text-white hover:text-gray-200 transition-colors"
+                    aria-label="Close"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className={`inline-block px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(jobStatus)}`}>
+                    {jobStatus}
+                  </div>
+                  {lateReason && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-300">
+                      <TriangleAlert className="w-4 h-4" />
+                      <span>{lateReason}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                {/* Project Information */}
+                <div className="border-b border-gray-200 pb-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Project</h3>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-lg font-semibold text-gray-900">{projectName}</p>
+                    </div>
+                    {selectedJob.subtitle && (
+                      <div>
+                        <p className="text-sm text-gray-600 leading-relaxed">{selectedJob.subtitle}</p>
+                      </div>
+                    )}
+                    <div className="pt-2">
+                      <button 
+                        onClick={() => window.open(`/projects/${selectedJob.projectId}`, '_blank')}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                      >
+                        View Project Details
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Worker Information */}
+                <div className="border-b border-gray-200 pb-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Worker</h3>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-base font-medium text-gray-900">{worker?.name || 'Not Assigned'}</p>
+                      {worker?.position && (
+                        <p className="text-sm text-gray-600">{worker.position}</p>
+                      )}
+                    </div>
+                    {worker?.phone && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                        </svg>
+                        <a href={`tel:${worker.phone}`} className="hover:text-blue-600">{worker.phone}</a>
+                      </div>
+                    )}
+                    {worker?.email && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <a href={`mailto:${worker.email}`} className="hover:text-blue-600">{worker.email}</a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Schedule Information */}
+                <div className="border-b border-gray-200 pb-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Schedule</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Scheduled Time</p>
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {formatDateTime(selectedJob.scheduledStart)}
+                          </p>
+                          {selectedJob.scheduledEnd && (
+                            <p className="text-sm text-gray-600">
+                              to {formatDateTime(selectedJob.scheduledEnd)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {(selectedJob.actualStart || selectedJob.actualEnd) && (
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Actual Time</p>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div>
+                            {selectedJob.actualStart ? (
+                              <p className="text-sm font-medium text-gray-900">
+                                {formatDateTime(selectedJob.actualStart)}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-gray-400 italic">Not started</p>
+                            )}
+                            {selectedJob.actualEnd ? (
+                              <p className="text-sm text-gray-600">
+                                to {formatDateTime(selectedJob.actualEnd)}
+                              </p>
+                            ) : selectedJob.actualStart ? (
+                              <p className="text-sm text-blue-600 font-medium">In Progress</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div className="pt-2">
+                      <p className="text-xs text-gray-500 mb-1">Duration</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedJob.duration.toFixed(1)} hours</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
