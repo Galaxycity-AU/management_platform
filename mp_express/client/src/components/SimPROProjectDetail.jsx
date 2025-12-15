@@ -1,10 +1,835 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Calendar, User, Zap, Clock, DollarSign, ArrowLeft, MoreHorizontal, Plus, FileText, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 
-export const SimPROProjectDetail = ({ project, logs, onBack }) => {
+// --- Worker Gantt Component (Reused logic) ---
+const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+const WorkerGanttChart = ({ logs, currentDate, schedules = [] }) => {
+  // Convert schedules to timeline items for the current date
+  const scheduleItems = schedules
+    .filter(schedule => {
+      if (!schedule.Date) return false;
+      const scheduleDate = new Date(schedule.Date);
+      return scheduleDate.getDate() === currentDate.getDate() &&
+             scheduleDate.getMonth() === currentDate.getMonth() &&
+             scheduleDate.getFullYear() === currentDate.getFullYear();
+    })
+    .map(schedule => {
+      const scheduleDate = schedule.Date ? new Date(schedule.Date) : currentDate;
+      
+      // Process each block in the schedule
+      return schedule.Blocks?.map((block, blockIdx) => {
+        const [startHour, startMin] = block.StartTime.split(':').map(Number);
+        const [endHour, endMin] = block.EndTime.split(':').map(Number);
+        
+        const startTime = new Date(scheduleDate);
+        startTime.setHours(startHour, startMin, 0, 0);
+        
+        const endTime = new Date(scheduleDate);
+        endTime.setHours(endHour, endMin, 0, 0);
+        
+        return {
+          id: `schedule-${schedule.ID}-${blockIdx}`,
+          workerName: schedule.Staff?.Name || 'Unassigned',
+          role: schedule.Staff?.Type || 'Schedule',
+          projectId: '',
+          projectName: '',
+          scheduledStart: startTime,
+          scheduledEnd: endTime,
+          actualStart: null,
+          actualEnd: null,
+          status: 'WAITING_APPROVAL',
+          isSchedule: true,
+          scheduleData: schedule,
+          blockData: block,
+        };
+      }) || [];
+    }).flat();
+  
+  // Combine logs and schedule items
+  const allItems = [...logs.map(log => ({ ...log, isSchedule: false })), ...scheduleItems];
+  
+  if (allItems.length === 0) return (
+      <div className="py-12 flex flex-col items-center justify-center text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <Clock className="w-10 h-10 mb-2 opacity-20" />
+          <p>No active shifts recorded for {currentDate.toLocaleDateString()}.</p>
+      </div>
+  );
+
+  let minTime = new Date(currentDate);
+  minTime.setHours(8, 0, 0, 0);
+  let maxTime = new Date(currentDate);
+  maxTime.setHours(18, 0, 0, 0);
+
+  allItems.forEach(item => {
+    if (item.scheduledStart < minTime) minTime = new Date(item.scheduledStart);
+    if (item.scheduledEnd > maxTime) maxTime = new Date(item.scheduledEnd);
+    if (item.actualStart && item.actualStart < minTime) minTime = new Date(item.actualStart);
+    const endRef = item.actualEnd || new Date();
+    if (endRef > maxTime) maxTime = endRef;
+  });
+
+  minTime = new Date(minTime.getTime() - 30 * 60000);
+  maxTime = new Date(maxTime.getTime() + 30 * 60000);
+  const totalDuration = maxTime.getTime() - minTime.getTime();
+  const getPos = (date) => Math.max(0, Math.min(100, ((date.getTime() - minTime.getTime()) / totalDuration) * 100));
+
+  const markers = [];
+  const curr = new Date(minTime);
+  curr.setMinutes(0, 0, 0);
+  if (curr < minTime) curr.setHours(curr.getHours() + 1);
+  while (curr < maxTime) {
+    markers.push(new Date(curr));
+    curr.setHours(curr.getHours() + 1);
+  }
+
+  const now = new Date();
+  const isToday = currentDate.getDate() === now.getDate() && 
+                  currentDate.getMonth() === now.getMonth() && 
+                  currentDate.getFullYear() === now.getFullYear();
+                  
+  const currentPos = getPos(now);
+
   return (
-    <div className="p-6">
-      <button onClick={onBack} className="mb-4 text-indigo-600">← Back</button>
-      <h2 className="text-2xl font-bold">{project.name}</h2>
+    <div className="mt-4 relative overflow-x-auto">
+      {/* Container with min-width to ensure scroll on mobile */}
+      <div className="min-w-[600px] pb-4">
+        <div className="relative h-6 w-full border-b border-gray-200 mb-4">
+            {markers.map((time, i) => (
+            <div key={i} className="absolute bottom-0 text-[10px] text-gray-400 transform -translate-x-1/2 border-l border-gray-200 h-full pl-1" style={{ left: `${getPos(time)}%` }}>
+                {time.getHours()}:00
+            </div>
+            ))}
+        </div>
+        <div className="space-y-6">
+            {allItems.map((item) => {
+            const schedLeft = getPos(item.scheduledStart);
+            const schedWidth = getPos(item.scheduledEnd) - schedLeft;
+            const actualStart = item.actualStart || (item.isSchedule ? null : item.scheduledStart);
+            const actualEnd = item.actualEnd || (item.isSchedule ? null : (isToday ? now : item.scheduledEnd));
+            const isLive = !item.actualEnd && !item.isSchedule && isToday;
+            
+            const actualLeft = actualStart ? getPos(actualStart) : schedLeft;
+            const actualWidth = actualStart ? Math.max(1, getPos(actualEnd) - actualLeft) : 0;
+            
+            // Status colors - schedules use different styling
+            let barColor = 'bg-indigo-500';
+            if (!item.isSchedule) {
+              barColor = isLive ? 'bg-green-500' : (item.status === 'APPROVED' ? 'bg-blue-500' : 'bg-amber-400');
+            }
+
+            return (
+                <div key={item.id} className="group flex items-center gap-4">
+                <div className="w-32 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                              item.isSchedule ? 'bg-indigo-100 text-indigo-700' : 'bg-indigo-100 text-indigo-700'
+                            }`}>
+                                {item.workerName.charAt(0)}
+                            </div>
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-medium text-gray-900 truncate">{item.workerName}</p>
+                                <p className="text-[10px] text-gray-500 truncate">
+                                  {item.isSchedule ? 'Scheduled' : item.role}
+                                </p>
+                            </div>
+                    </div>
+                </div>
+                <div className="flex-1 relative h-8 bg-gray-50 rounded border border-gray-100 overflow-hidden">
+                        {markers.map((time, i) => (<div key={i} className="absolute top-0 bottom-0 w-px bg-gray-200 opacity-30" style={{ left: `${getPos(time)}%` }}></div>))}
+                        <div 
+                          className={`absolute top-1.5 h-5 rounded-sm ${
+                            item.isSchedule 
+                              ? 'bg-indigo-100 border border-indigo-300' 
+                              : 'bg-indigo-100/50 border border-indigo-200 border-dashed'
+                          }`} 
+                          style={{ left: `${schedLeft}%`, width: `${schedWidth}%` }}
+                        >
+                          {item.isSchedule && item.blockData && (
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-indigo-700">
+                              {item.blockData.Hrs}h
+                            </span>
+                          )}
+                        </div>
+                        {!item.isSchedule && item.actualStart && (
+                            <div className={`absolute top-2.5 h-3 rounded-full shadow-sm ${barColor} transition-all duration-500`} style={{ left: `${actualLeft}%`, width: `${actualWidth}%` }}>
+                                {isLive && <span className="absolute -right-1 top-0 bottom-0 w-2 bg-white/30 animate-pulse rounded-full"></span>}
+                            </div>
+                        )}
+                </div>
+                <div className="w-24 text-right flex-shrink-0">
+                    {item.isSchedule ? (
+                      <>
+                        <div className="text-xs font-bold text-indigo-600">Scheduled</div>
+                        <div className="text-[10px] text-gray-400">
+                          {formatTime(item.scheduledStart)} - {formatTime(item.scheduledEnd)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className={`text-xs font-bold ${isLive ? 'text-green-600' : 'text-gray-600'}`}>{isLive ? 'Active' : 'Done'}</div>
+                        <div className="text-[10px] text-gray-400">
+                          {item.actualStart ? formatTime(item.actualStart) : '--'} - {isLive ? '...' : (item.actualEnd ? formatTime(item.actualEnd) : '--')}
+                        </div>
+                      </>
+                    )}
+                </div>
+                </div>
+            );
+            })}
+        </div>
+        {isToday && currentPos > 0 && currentPos < 100 && (
+            <div className="absolute top-8 bottom-4 w-px bg-red-400 z-10 pointer-events-none border-l border-dashed border-red-500" style={{ left: `${currentPos}%` }}>
+                <div className="absolute -top-1 -translate-x-1/2 text-[9px] bg-red-500 text-white px-1 rounded shadow-sm whitespace-nowrap">Now</div>
+            </div>
+        )}
+      </div>
+      
+      {/* Legend */}
+      <div className="flex gap-4 mt-4 text-[10px] text-gray-500 justify-end flex-wrap">
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-100 border border-indigo-300"></div> Schedule</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-indigo-100 border border-indigo-200 border-dashed"></div> Log Scheduled</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500 rounded-full"></div> Active</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> Completed</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded-full"></div> Pending Review</div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main Detail Component ---
+
+export const SimPROProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
+  const [activeTab, setActiveTab] = useState('LIVE');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [dailyNotes, setDailyNotes] = useState({});
+  const [noteSaved, setNoteSaved] = useState(false);
+  const [noteLastUpdated, setNoteLastUpdated] = useState({});
+
+  // Helper function to create consistent date key for storage
+  const getDateKey = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Get notes for current date
+  const currentDateKey = getDateKey(currentDate);
+  const currentNotes = dailyNotes[currentDateKey] || '';
+
+  // Handle notes change
+  const handleNotesChange = (value) => {
+    setDailyNotes(prev => ({
+      ...prev,
+      [currentDateKey]: value
+    }));
+    // Clear the saved feedback when user edits
+    setNoteSaved(false);
+  };
+
+  // Handle save notes
+  const handleSaveNotes = () => {
+    if (currentNotes.trim()) {
+      setNoteLastUpdated(prev => ({
+        ...prev,
+        [currentDateKey]: new Date()
+      }));
+      setNoteSaved(true);
+      // Clear saved feedback after 2 seconds
+      setTimeout(() => setNoteSaved(false), 2000);
+      // In a real app, you'd save to backend/localStorage here
+      console.log(`Notes saved for ${currentDateKey}:`, currentNotes);
+    }
+  };
+
+  // Handle clear notes
+  const handleClearNotes = () => {
+    if (window.confirm('Are you sure you want to clear these notes?')) {
+      setDailyNotes(prev => {
+        const updated = { ...prev };
+        delete updated[currentDateKey];
+        return updated;
+      });
+      setNoteLastUpdated(prev => {
+        const updated = { ...prev };
+        delete updated[currentDateKey];
+        return updated;
+      });
+    }
+  };
+
+  // Navigation Handlers
+  const handlePrevDay = () => {
+    const prev = new Date(currentDate);
+    prev.setDate(prev.getDate() - 1);
+    setCurrentDate(prev);
+  };
+
+  const handleNextDay = () => {
+    const next = new Date(currentDate);
+    next.setDate(next.getDate() + 1);
+    setCurrentDate(next);
+  };
+
+  const isToday = (d) => {
+      const now = new Date();
+      return d.getDate() === now.getDate() && 
+             d.getMonth() === now.getMonth() && 
+             d.getFullYear() === now.getFullYear();
+  };
+
+  // Filter logs for selected Date
+  const displayLogs = logs.filter(l => 
+    l.scheduledStart.getDate() === currentDate.getDate() && 
+    l.scheduledStart.getMonth() === currentDate.getMonth() &&
+    l.scheduledStart.getFullYear() === currentDate.getFullYear()
+  );
+  
+  // Filter schedules for selected Date
+  const displaySchedules = project.schedules?.filter(s => {
+    if (!s.Date) return false;
+    const scheduleDate = new Date(s.Date);
+    return scheduleDate.getDate() === currentDate.getDate() &&
+           scheduleDate.getMonth() === currentDate.getMonth() &&
+           scheduleDate.getFullYear() === currentDate.getFullYear();
+  }) || [];
+
+  // Financial Data Mockup
+  const financeData = [
+      { name: 'Labor', budget: project.budget * 0.6, spent: project.spent * 0.65 },
+      { name: 'Materials', budget: project.budget * 0.3, spent: project.spent * 0.25 },
+      { name: 'Overhead', budget: project.budget * 0.1, spent: project.spent * 0.1 },
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+        {/* Top Navigation / Breadcrumb */}
+        <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex flex-col md:flex-row md:items-center justify-between sticky top-0 z-20 shadow-sm gap-4 flex-shrink-0">
+            <div className="flex items-center gap-3 md:gap-4">
+                <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                    <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="min-w-0">
+                    <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2 truncate">
+                        <span className="truncate">{project.name}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border flex-shrink-0 ${project.status === 'ACTIVE' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                            {project.status}
+                        </span>
+                    </h1>
+                    <p className="text-xs md:text-sm text-gray-500 truncate">{project.client} • {project.id}</p>
+                </div>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+                <button className="p-2 text-gray-400 hover:text-gray-600">
+                    <MoreHorizontal className="w-5 h-5" />
+                </button>
+            </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 max-w-7xl mx-auto w-full space-y-4 md:space-y-6">
+            
+            {/* High Level Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Budget</span>
+                    <div className="flex items-end justify-between mt-2">
+                        <span className="text-lg md:text-2xl font-bold text-gray-900">${project.budget.toLocaleString()} / ${project.spent.toLocaleString()}</span>
+                        <DollarSign className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
+                    </div>
+                </div>
+                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Deadline</span>
+                    <div className="flex items-end justify-between mt-2">
+                        <span className="text-sm md:text-lg font-bold text-gray-900">{project.scheduledEnd.toLocaleDateString()}</span>
+                        <Calendar className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
+                    </div>
+                </div>
+                <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
+                    <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Project Manager</span>
+                    <div className="flex items-end justify-between mt-2">
+                        <span className="text-lg md:text-2xl font-bold text-gray-900">{project.projectManager}</span>
+                        <User className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Tabs Container */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 min-h-[500px] flex flex-col">
+                <div className="border-b border-gray-200 px-4 md:px-6 flex items-center gap-6 overflow-x-auto">
+                    <button 
+                        onClick={() => setActiveTab('LIVE')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'LIVE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Live Operations
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('FINANCE')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'FINANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Financial Overview
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('INFO')}
+                        className={`py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'INFO' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        Project Details
+                    </button>
+                </div>
+
+                <div className="p-4 md:p-6 flex-1">
+                    {/* LIVE TAB */}
+                    {activeTab === 'LIVE' && (
+                        <div className="animate-in fade-in duration-300">
+                            <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-3">
+                                <div>
+                                    <h3 className="text-lg font-bold text-gray-900">Daily Schedule</h3>
+                                    <p className="text-sm text-gray-500">Track worker shifts and progress.</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center bg-white border border-gray-200 rounded-lg shadow-sm">
+                                        <button onClick={handlePrevDay} className="p-2 hover:bg-gray-50 text-gray-500 border-r border-gray-200">
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <div className="px-4 py-2 text-sm font-medium text-gray-700 flex items-center gap-2 min-w-[140px] justify-center">
+                                            <Calendar className="w-4 h-4 text-gray-400" />
+                                            {isToday(currentDate) ? 'Today' : currentDate.toLocaleDateString()}
+                                        </div>
+                                        <button onClick={handleNextDay} className="p-2 hover:bg-gray-50 text-gray-500 border-l border-gray-200">
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <button className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap">
+                                        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Assign</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-gray-50/50 rounded-xl border border-gray-100 p-4 md:p-6">
+                                <WorkerGanttChart logs={displayLogs} currentDate={currentDate} schedules={displaySchedules} />
+                            </div>
+
+
+                            
+                            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Daily Logs Section */}
+                                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-50 rounded-lg">
+                                                <Clock className="w-5 h-5 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-lg text-gray-800">Daily Logs</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    {displayLogs.length} log{displayLogs.length !== 1 ? 's' : ''} for {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                                        {displayLogs.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {displayLogs.map((log) => {
+                                                    const isLive = !log.actualEnd && isToday(currentDate);
+                                                    const statusColor = 
+                                                        isLive ? 'bg-green-100 text-green-700 border-green-200' :
+                                                        log.status === 'APPROVED' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                        log.status === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' :
+                                                        'bg-amber-100 text-amber-700 border-amber-200';
+                                                    
+                                                    return (
+                                                        <div key={log.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
+                                                            <div className="flex items-start justify-between mb-2">
+                                                                <div className="flex-1">
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-xs font-bold text-indigo-700">
+                                                                            {log.workerName.charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-sm font-semibold text-gray-900">{log.workerName}</p>
+                                                                            <p className="text-xs text-gray-500">{log.role}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <span className={`px-2 py-1 rounded-full text-xs font-medium border ${statusColor}`}>
+                                                                    {isLive ? 'Active' : 
+                                                                     log.status === 'APPROVED' ? 'Approved' :
+                                                                     log.status === 'REJECTED' ? 'Rejected' :
+                                                                     'Pending'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
+                                                                <div>
+                                                                    <span className="text-gray-500">Scheduled:</span>
+                                                                    <p className="text-gray-900 font-medium mt-0.5">
+                                                                        {formatTime(log.scheduledStart)} - {formatTime(log.scheduledEnd)}
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-gray-500">Actual:</span>
+                                                                    <p className="text-gray-900 font-medium mt-0.5">
+                                                                        {log.actualStart ? formatTime(log.actualStart) : '--'} - {log.actualEnd ? formatTime(log.actualEnd) : (isLive ? 'Ongoing' : '--')}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            {log.notes && (
+                                                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                                                    <p className="text-xs text-gray-600 italic">"{log.notes}"</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                                                <Clock className="w-10 h-10 mb-2 opacity-20" />
+                                                <p className="text-sm">No logs recorded for {currentDate.toLocaleDateString()}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Daily Notes Section */}
+                                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-50 rounded-lg">
+                                                <FileText className="w-5 h-5 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold text-lg text-gray-800">Daily Notes</h4>
+                                                {noteLastUpdated[currentDateKey] && (
+                                                    <p className="text-xs text-gray-500 mt-0.5">
+                                                        Updated {noteLastUpdated[currentDateKey].toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {noteSaved && (
+                                            <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                Saved
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="space-y-3">
+                                        <textarea
+                                            value={currentNotes}
+                                            onChange={(e) => handleNotesChange(e.target.value)}
+                                            maxLength={500}
+                                            className="w-full min-h-[200px] p-4 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y text-sm text-gray-700 placeholder-gray-400"
+                                            placeholder="Add notes about today's operations, issues, achievements, or important updates..."
+                                        />
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-xs text-gray-500">
+                                                {currentNotes.length} / 500 characters
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {currentNotes.trim() && (
+                                                    <button
+                                                        onClick={handleClearNotes}
+                                                        className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
+                                                    >
+                                                        Clear
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={handleSaveNotes}
+                                                    disabled={!currentNotes.trim()}
+                                                    className="px-4 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                                >
+                                                    <CheckCircle2 className="w-3 h-3" />
+                                                    Save Notes
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FINANCE TAB */}
+                    {activeTab === 'FINANCE' && (
+                        <div className="animate-in fade-in duration-300">
+                             <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-gray-900">Cost Breakdown</h3>
+                                <div className="text-sm text-gray-500">Last updated: Today</div>
+                            </div>
+                            
+                            <div className="h-80 w-full mb-8">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart
+                                        data={financeData}
+                                        layout="vertical"
+                                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" />
+                                        <YAxis dataKey="name" type="category" width={80} />
+                                        <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                                        <Legend />
+                                        <Bar dataKey="budget" name="Budget Allocated" fill="#e0e7ff" radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="spent" name="Actual Spent" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {financeData.map((item, idx) => (
+                                    <div key={idx} className="p-4 rounded-lg border border-gray-200 bg-white">
+                                        <p className="text-sm font-medium text-gray-500 mb-1">{item.name}</p>
+                                        <div className="flex items-baseline justify-between">
+                                            <span className="text-xl font-bold text-gray-900">${item.spent.toLocaleString()}</span>
+                                            <span className={`text-xs font-medium ${item.spent > item.budget ? 'text-red-500' : 'text-green-500'}`}>
+                                                {((item.spent/item.budget)*100).toFixed(0)}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+                                            <div className={`h-1.5 rounded-full ${item.spent > item.budget ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, (item.spent/item.budget)*100)}%`}}></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* INFO TAB */}
+                    {activeTab === 'INFO' && (
+                        <div className="animate-in fade-in duration-300">
+                            <h3 className="text-lg font-bold text-gray-900 mb-6">Project Information</h3>
+                            <div className="space-y-6">
+                                {/* Basic Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Basic Information</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Project ID</label>
+                                            <p className="text-gray-900 mt-1 font-medium">{project.id}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Client</label>
+                                            <p className="text-gray-900 mt-1 font-medium">{project.client || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Status</label>
+                                            <p className="mt-1">
+                                                <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                                                    project.status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' :
+                                                    project.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
+                                                    project.status === 'DELAYED' ? 'bg-red-100 text-red-700' :
+                                                    project.status === 'ON_HOLD' ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-gray-100 text-gray-700'
+                                                }`}>
+                                                    {project.status || 'Unknown'}
+                                                </span>
+                                            </p>
+                                        </div>
+                                        {project.projectManager && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Project Manager</label>
+                                                <p className="text-gray-900 mt-1 font-medium">{project.projectManager}</p>
+                                            </div>
+                                        )}
+                                        {project.stage && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Stage</label>
+                                                <p className="text-gray-900 mt-1 font-medium">{project.stage}</p>
+                                            </div>
+                                        )}
+                                        {project.progress !== undefined && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Progress</label>
+                                                <div className="mt-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                            <div 
+                                                                className="bg-indigo-600 h-2 rounded-full transition-all"
+                                                                style={{ width: `${project.progress}%` }}
+                                                            ></div>
+                                                        </div>
+                                                        <span className="text-sm font-medium text-gray-900">{project.progress}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {project.description && (
+                                        <div className="mt-6">
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</label>
+                                            <p className="text-gray-700 mt-2 leading-relaxed">{project.description}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Timeline Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Timeline</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {project.scheduledStart ? (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled Start</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.scheduledStart.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled Start</label>
+                                                <p className="text-gray-500 mt-1 font-medium italic">Not scheduled</p>
+                                            </div>
+                                        )}
+                                        {project.scheduledEnd ? (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled End</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.scheduledEnd.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Scheduled End</label>
+                                                <p className="text-gray-500 mt-1 font-medium italic">Not scheduled</p>
+                                            </div>
+                                        )}
+                                        {project.actualStart && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Actual Start</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.actualStart.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {project.actualEnd && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Actual End</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.actualEnd.toLocaleDateString('en-US', { 
+                                                        weekday: 'short', 
+                                                        year: 'numeric', 
+                                                        month: 'short', 
+                                                        day: 'numeric' 
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {project.scheduledStart && project.scheduledEnd && (
+                                        <div className="mt-6">
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Duration</label>
+                                            <p className="text-gray-900 mt-1 font-medium">
+                                                {Math.ceil((project.scheduledEnd.getTime() - project.scheduledStart.getTime()) / (1000 * 60 * 60 * 24))} days
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Financial Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Financial Overview</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Budget</label>
+                                            <p className="text-gray-900 mt-1 font-medium text-lg">${project.budget.toLocaleString()} / ${project.spent.toLocaleString()}</p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Remaining Budget</label>
+                                            <p className={`mt-1 font-medium text-lg ${(project.budget - project.spent) < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                                ${(project.budget - project.spent).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Budget Utilization</label>
+                                            <div className="mt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                                        <div 
+                                                            className={`h-2 rounded-full transition-all ${
+                                                                (project.spent / project.budget) > 1 ? 'bg-red-500' :
+                                                                (project.spent / project.budget) > 0.9 ? 'bg-yellow-500' :
+                                                                'bg-green-500'
+                                                            }`}
+                                                            style={{ width: `${Math.min(100, (project.spent / project.budget) * 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className={`text-sm font-medium ${
+                                                        (project.spent / project.budget) > 1 ? 'text-red-600' :
+                                                        (project.spent / project.budget) > 0.9 ? 'text-yellow-600' :
+                                                        'text-green-600'
+                                                    }`}>
+                                                        {((project.spent / project.budget) * 100).toFixed(1)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Additional Information */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h4 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">Additional Information</h4>
+                                    <div className="space-y-6">
+                                        {project.tags && project.tags.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
+                                                <div className="flex gap-2 mt-2 flex-wrap">
+                                                    {project.tags.map(tag => (
+                                                        <span key={tag} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium border border-indigo-100">
+                                                            {tag}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {project.schedules && project.schedules.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Schedules</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {project.schedules.length} schedule{project.schedules.length !== 1 ? 's' : ''} recorded
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Total hours: {project.schedules.reduce((sum, s) => sum + (s.TotalHours || 0), 0).toFixed(1)}h
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    Unique staff: {new Set(project.schedules.map(s => s.Staff?.ID).filter(Boolean)).size} member{new Set(project.schedules.map(s => s.Staff?.ID).filter(Boolean)).size !== 1 ? 's' : ''}
+                                                </p>
+                                            </div>
+                                        )}
+                                        {logs && logs.length > 0 && (
+                                            <div>
+                                                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Team Members</label>
+                                                <p className="text-gray-900 mt-1 font-medium">
+                                                    {new Set(logs.map(l => l.workerName)).size} team member{new Set(logs.map(l => l.workerName)).size !== 1 ? 's' : ''}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Total work logs: {logs.length}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     </div>
   );
 };

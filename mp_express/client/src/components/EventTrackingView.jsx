@@ -167,5 +167,3 @@ export const EventTrackingView = ({
     </div>
   );
 };
-
-export default EventTrackingView;

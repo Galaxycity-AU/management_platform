@@ -1,8 +1,6 @@
 import React from 'react';
-import { ProjectStatus, LogStatus } from '../types';
 import { Calendar, User, Zap, Clock } from 'lucide-react';
 import { getStatusColorCard, formatDate, filterTodaysLogs, filterUpcomingSchedules } from '../utils/projectUtils';
-import { filterTodaysLogs as filterTodaysLogsUtil, filterUpcomingSchedules as filterUpcomingSchedulesUtil } from '../utils/dateUtils';
 
 // Helper to format time
 const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -34,7 +32,7 @@ const WorkerGanttChart = ({ logs, schedules = [] }) => {
         scheduledEnd: endTime,
         actualStart: null,
         actualEnd: null,
-        status: LogStatus.SCHEDULE,
+        status: 'PENDING',
         isSchedule: true,
         scheduleData: schedule,
         blockData: block,
@@ -123,7 +121,7 @@ const WorkerGanttChart = ({ logs, schedules = [] }) => {
           // Status colors - schedules use different styling
           let barColor = 'bg-indigo-500';
           if (!item.isSchedule) {
-            barColor = isLive ? 'bg-green-500' : (item.status === LogStatus.APPROVED ? 'bg-blue-500' : 'bg-amber-400');
+            barColor = isLive ? 'bg-green-500' : (item.status === 'APPROVED' ? 'bg-blue-500' : 'bg-amber-400');
           }
           
           return (
@@ -224,10 +222,10 @@ const WorkerGanttChart = ({ logs, schedules = [] }) => {
 export const SimPROProjectCard = ({ project, logs, onAnalyze }) => {
   // Filter for display: Show only logs and schedules relevant to the current "view" (e.g., Today's active/recent logs)
   // For this UI, we assume we are looking at "Today's" timeline or the most recent active day
-  const todaysLogs = filterTodaysLogsUtil(logs);
+  const todaysLogs = filterTodaysLogs(logs);
   
   // Filter today's and upcoming schedules (next 7 days)
-  const upcomingSchedules = project.schedules ? filterUpcomingSchedulesUtil(project.schedules, 7) : [];
+  const upcomingSchedules = project.schedules ? filterUpcomingSchedules(project.schedules, 7) : [];
   
   // If no logs today, maybe show the most recent 3 logs? 
   // For parallel view to make sense, they should probably be on the same day.

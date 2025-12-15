@@ -1,65 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, ClipboardCheck, Bell, Search, Loader2, ArrowLeft, Menu, Code, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Project, WorkerLog, LogStatus, ProjectStatus } from './types';
-import { analyzeProjectHealth } from './services/geminiService';
-import { ProjectTable } from './components/ProjectTable';
+import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
+import { Layout } from './components/Layout';
+import DashboardPage from './pages/Dashboard';
+import ProjectsPage from './pages/Projects';
+import SimPROProjectPage from './pages/SimPROProject';
+import ApprovalsPage from './pages/Approvals';
+import API_TestingPage from './pages/API_Testing';
 import { ProjectDetail } from './components/ProjectDetail';
-import { SimPROProjectTable } from './components/SimPROProjectTable';
 import { SimPROProjectDetail } from './components/SimPROProjectDetail';
-import { ApprovalQueue } from './components/ApprovalQueue';
-import { DashboardStatsView } from './components/DashboardStats';
-import API_Testing from './components/API_Testing';
-import { truncateClientName } from './utils/stringUtils';
-
-const View = {
-  DASHBOARD: 'dashboard',
-  PROJECTS: 'projects',
-  SIMPRO_PROJECTS: 'simpro-projects',
-  APPROVALS: 'approvals',
-  API_TESTING: 'api-testing',
-};
+import { fetchProjects, fetchJobs, fetchWorkers } from './utils/apiUtils';
+import { LogStatus } from './types';
 
 function App() {
-  const [currentView, setCurrentView] = useState(View.DASHBOARD);
   const [projects, setProjects] = useState([]);
   const [logs, setLogs] = useState([]);
   const [simproProjects, setSimproProjects] = useState([]);
   const [simproLogs, setSimproLogs] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
-  const [selectedSimPROProject, setSelectedSimPROProject] = useState(null);
-
-  const [searchQuery, setSearchQuery] = useState('');
   const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Sidebar collapse state with localStorage persistence
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsed');
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  const toggleSidebar = () => {
-    const newState = !isSidebarCollapsed;
-    setIsSidebarCollapsed(newState);
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
-  };
-
-  // Load SimPRO data from JSON file
+  // Load SimPRO data
   const loadSimPROData = async () => {
     try {
       const response = await fetch('/api/simpro/projects');
       const data = await response.json();
 
-      const projectsWithDates = data.projects.map((p) => ({
+      const projectsWithDates = (data.projects || []).map((p) => ({
         ...p,
-        client: truncateClientName(p.client || ''),
         scheduledStart: p.scheduledStart ? new Date(p.scheduledStart) : new Date(),
         scheduledEnd: p.scheduledEnd ? new Date(p.scheduledEnd) : new Date(),
         status: p.status,
         schedules: p.schedules || [],
       }));
 
-      const logsWithDates = data.logs.map((l) => ({
+      const logsWithDates = (data.logs || []).map((l) => ({
         ...l,
         scheduledStart: new Date(l.scheduledStart),
         scheduledEnd: new Date(l.scheduledEnd),
@@ -77,17 +51,14 @@ function App() {
     }
   };
 
+  // Load DB data
   const loadDBData = async () => {
     try {
-      const apiBaseUrl = '/api';
-
-      const fetchProjects = await fetch(`${apiBaseUrl}/projects`);
-
-      if (!fetchProjects.ok) {
-        throw new Error(`HTTP error! status: ${fetchProjects.status}`);
-      }
-
-      const projectsData = await fetchProjects.json();
+      const [projectsData, jobsData, workersData] = await Promise.all([
+        fetchProjects(),
+        fetchJobs(),
+        fetchWorkers()
+      ]);
 
       const toSafeDate = (d) => {
         if (d == null) return null;
@@ -106,81 +77,52 @@ function App() {
 
       setProjects(projectData);
 
-      try {
-        const [fetchJobs, fetchWorkers] = await Promise.all([
-          fetch(`${apiBaseUrl}/jobs`),
-          fetch(`${apiBaseUrl}/workers`)
-        ]);
+      const workersMap = new Map(workersData.map((w) => [w.id, w]));
+      const projectsMap = new Map(projectData.map((p) => [Number(p.id), p]));
 
-        if (fetchJobs.ok && fetchWorkers.ok) {
-          const jobsData = await fetchJobs.json();
-          const workersData = await fetchWorkers.json();
+      const logsData = jobsData
+        .filter((job) => {
+          const startTime = job.actual_start || job.modified_start || job.scheduled_start;
+          const endTime = job.actual_end || job.modified_end || job.scheduled_end;
+          return startTime && endTime;
+        })
+        .map((job) => {
+          const worker = workersMap.get(job.worker_id);
+          const project = projectsMap.get(job.project_id);
 
-          const workersMap = new Map(workersData.map((w) => [w.id, w]));
-          const projectsMap = new Map(projectData.map((p) => [Number(p.id), p]));
+          const scheduledStart = new Date(job.scheduled_start);
+          const scheduledEnd = new Date(job.scheduled_end);
+          const actualStart = job.actual_start ? new Date(job.actual_start) : null;
+          const actualEnd = job.actual_end ? new Date(job.actual_end) : null;
 
-          const logsData = jobsData
-            .filter((job) => {
-              const startTime = job.actual_start || job.modified_start || job.scheduled_start;
-              const endTime = job.actual_end || job.modified_end || job.scheduled_end;
-              return startTime && endTime;
-            })
-            .map((job) => {
-              const worker = workersMap.get(job.worker_id);
-              const project = projectsMap.get(job.project_id);
+          const logStatus = job.status === 'schedule' ? LogStatus.SCHEDULE :
+            job.status === 'active' ? LogStatus.ACTIVE :
+              job.status === 'approved' ? LogStatus.APPROVED :
+                job.status === 'rejected' ? LogStatus.REJECTED :
+                  job.status === 'waiting_approval' ? LogStatus.WAITING_APPROVAL :
+                    LogStatus.SCHEDULE;
 
-              const scheduledStart = new Date(job.scheduled_start);
-              const scheduledEnd = new Date(job.scheduled_end);
-              const actualStart = job.actual_start ? new Date(job.actual_start) : null;
-              const actualEnd = job.actual_end ? new Date(job.actual_end) : null;
+          return {
+            id: String(job.id),
+            workerName: worker?.name || 'Unknown Worker',
+            role: worker?.position || 'Worker',
+            projectId: String(job.project_id),
+            projectName: project?.name || 'Unknown Project',
+            scheduledStart,
+            scheduledEnd,
+            actualStart,
+            actualEnd,
+            originalActualStart: actualStart,
+            originalActualEnd: actualEnd,
+            status: logStatus,
+            notes: `Job #${job.id}`,
+            adjustmentReason: job.modified_start ? 'Job rescheduled' : undefined,
+            approvedAt: actualEnd || undefined,
+            approvedBy: actualEnd ? 'System' : undefined
+          };
+        });
 
-              const logStatus = job.status === 'schedule' ? LogStatus.SCHEDULE :
-                job.status === 'active' ? LogStatus.ACTIVE :
-                  job.status === 'approved' ? LogStatus.APPROVED :
-                    job.status === 'rejected' ? LogStatus.REJECTED :
-                      job.status === 'waiting_approval' ? LogStatus.WAITING_APPROVAL :
-                        LogStatus.SCHEDULE;
-
-              return {
-                id: String(job.id),
-                workerName: worker?.name || 'Unknown Worker',
-                role: worker?.position || 'Worker',
-                projectId: String(job.project_id),
-                projectName: project?.name || 'Unknown Project',
-                scheduledStart,
-                scheduledEnd,
-                actualStart,
-                actualEnd,
-                originalActualStart: actualStart,
-                originalActualEnd: actualEnd,
-                status: logStatus,
-                notes: `Job #${job.id}`,
-                adjustmentReason: job.modified_start ? 'Job rescheduled' : undefined,
-                approvedAt: actualEnd || undefined,
-                approvedBy: actualEnd ? 'System' : undefined
-              };
-            });
-
-          setLogs(logsData);
-
-          const updatedProjects = projectData.map(project => {
-            const projectJobs = jobsData.filter((job) => job.project_id === project.id);
-            const completedJobs = projectJobs.filter((job) => job.status === 'approved').length;
-            const progress = projectJobs.length > 0 ? (completedJobs / projectJobs.length) * 100 : 0;
-
-            return {
-              ...project,
-              progress: Math.round(progress)
-            };
-          });
-
-          setProjects(updatedProjects);
-        }
-      } catch (jobError) {
-        console.warn('Could not fetch jobs for logs:', jobError);
-        setLogs([]);
-      }
-
+      setLogs(logsData);
     } catch (error) {
       console.error('Error loading DB data:', error);
       setProjects([]);
@@ -193,385 +135,103 @@ function App() {
     loadSimPROData();
   }, []);
 
-  // Stats Calculation
-  const stats = {
-    totalProjects: projects.length,
-    activeProjects: projects.filter(p => p.status === ProjectStatus.ACTIVE).length,
-    delayedProjects: projects.filter(p => p.status === ProjectStatus.DELAYED).length,
-    pendingApprovals: logs.filter(l => l.status === LogStatus.WAITING_APPROVAL).length,
-  };
-
-  const projectStatusData = [
-    { name: 'Active', value: stats.activeProjects },
-    { name: 'Completed', value: projects.filter(p => p.status === ProjectStatus.COMPLETED).length },
-    { name: 'Delayed', value: stats.delayedProjects },
-    { name: 'Planning', value: projects.filter(p => p.status === ProjectStatus.PLANNING).length },
-  ];
-
-  const projectAlerts = projects.map(p => ({
-    ...p,
-    alerts: p.id % 2 === 0 ? true : false,
-    lateCase: p.id % 2 === 0 ? p.id + p.id : 0,
-    overTime: p.id % 3 === 0 ? p.id * 2 : 0,
-    overBudget: p.id == 8 ? p.id * 3 : 0,
-  })).filter(p => p.alerts);
-
-  // Handlers
-  const handleApproveLog = (id, adjustedStart, adjustedEnd, reason) => {
-    setLogs(prev => prev.map(l => {
-      if (l.id === id) {
-        return {
-          ...l,
-          status: LogStatus.APPROVED,
-          actualStart: adjustedStart || l.actualStart,
-          actualEnd: adjustedEnd || l.actualEnd,
-          adjustmentReason: reason,
-          approvedAt: new Date(),
-          approvedBy: 'Current User'
-        };
-      }
-      return l;
-    }));
-  };
-
-  const handleRejectLog = (id) => {
-    setLogs(prev => prev.map(l => l.id === id ? { ...l, status: LogStatus.REJECTED, approvedAt: new Date() } : l));
-  };
-
   const handleAnalyzeProject = async (project) => {
     setIsAnalyzing(true);
     setAiAnalysisResult(null);
     const projectLogs = logs.filter(l => l.projectId === project.id);
-    const result = await analyzeProjectHealth(project, projectLogs);
-    setAiAnalysisResult({ id: project.id, text: result });
-    setIsAnalyzing(false);
-  };
-
-  const handleSelectProject = (project) => {
-    setSelectedProject(project);
-    setCurrentView(View.PROJECTS);
-  };
-
-  const handleSelectSimPROProject = (project) => {
-    setSelectedSimPROProject(project);
-    setCurrentView(View.SIMPRO_PROJECTS);
-  };
-
-  const handleBackToTable = () => {
-    setSelectedProject(null);
-  };
-
-  const handleBackToSimPROTable = () => {
-    setSelectedSimPROProject(null);
-  };
-
-  const handleSwitchView = (view) => {
-    setCurrentView(view);
-    setSelectedProject(null);
-    setSelectedSimPROProject(null);
+    try {
+      const { analyzeProjectHealth } = await import('./services/geminiService');
+      const result = await analyzeProjectHealth(project, projectLogs);
+      setAiAnalysisResult({ id: project.id, text: result });
+    } catch (error) {
+      console.error('Error analyzing project:', error);
+      setAiAnalysisResult({ id: project.id, text: 'Error analyzing project. Please try again.' });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row h-screen overflow-hidden">
+    <Layout>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route 
+          path="/projects/:id" 
+          element={
+            <ProjectDetailWrapper 
+              projects={projects} 
+              logs={logs} 
+              onAnalyze={handleAnalyzeProject}
+            />
+          } 
+        />
+        <Route path="/simpro-projects" element={<SimPROProjectPage />} />
+        <Route 
+          path="/simpro-projects/:id" 
+          element={
+            <SimPROProjectDetailWrapper 
+              projects={simproProjects} 
+              logs={simproLogs} 
+              onAnalyze={handleAnalyzeProject}
+            />
+          } 
+        />
+        <Route path="/approvals" element={<ApprovalsPage />} />
+        <Route path="/api-testing" element={<API_TestingPage />} />
+      </Routes>
+    </Layout>
+  );
+}
 
-      {/* Sidebar (Desktop only - LG breakpoint) */}
-      <aside className={`hidden lg:flex ${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex-shrink-0 flex-col z-20 transition-all duration-300`}>
-        <div className={`p-6 border-b border-gray-100 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-          {!isSidebarCollapsed && (
-            <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
-              <LayoutDashboard className="w-6 h-6" />
-              ProjectFlow
-            </h1>
-          )}
-          {isSidebarCollapsed && (
-            <LayoutDashboard className="w-6 h-6 text-indigo-600" />
-          )}
-          <button
-            onClick={toggleSidebar}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700"
-            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
-        </div>
-        <nav className={`p-4 space-y-1 flex-1 overflow-y-auto ${isSidebarCollapsed ? 'items-center' : ''}`}>
-          <button
-            onClick={() => handleSwitchView(View.DASHBOARD)}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.DASHBOARD ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
-            title={isSidebarCollapsed ? 'Dashboard' : undefined}
-          >
-            <LayoutDashboard className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && <span>Dashboard</span>}
-          </button>
-          <button
-            onClick={() => handleSwitchView(View.PROJECTS)}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
-            title={isSidebarCollapsed ? `Projects (${projects.length})` : undefined}
-          >
-            <ListTodo className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && (
-              <>
-                <span>Projects ({projects.length})</span>
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => handleSwitchView(View.SIMPRO_PROJECTS)}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.SIMPRO_PROJECTS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
-            title={isSidebarCollapsed ? `SimPRO Projects (${simproProjects.length})` : undefined}
-          >
-            <ListTodo className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && (
-              <>
-                <span>SimPRO Projects ({simproProjects.length})</span>
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => handleSwitchView(View.APPROVALS)}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors relative ${currentView === View.APPROVALS ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
-            title={isSidebarCollapsed ? `Approvals${stats.pendingApprovals > 0 ? ` (${stats.pendingApprovals})` : ''}` : undefined}
-          >
-            <ClipboardCheck className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && (
-              <>
-                <span>Approvals</span>
-                {stats.pendingApprovals > 0 && (
-                  <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">{stats.pendingApprovals}</span>
-                )}
-              </>
-            )}
-            {isSidebarCollapsed && stats.pendingApprovals > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
-            )}
-          </button>
-          <button
-            onClick={() => handleSwitchView(View.API_TESTING)}
-            className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-4 py-3 text-sm font-medium rounded-lg transition-colors ${currentView === View.API_TESTING ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
-            title={isSidebarCollapsed ? 'API Testing' : undefined}
-          >
-            <Code className="w-5 h-5 flex-shrink-0" />
-            {!isSidebarCollapsed && <span>API Testing</span>}
-          </button>
-        </nav>
-        <div className={`p-4 border-t border-gray-100 ${isSidebarCollapsed ? 'flex justify-center' : ''}`}>
-          <div className={`flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200 ${isSidebarCollapsed ? 'w-8 h-8 p-0 justify-center' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">PM</div>
-            {!isSidebarCollapsed && (
-              <div>
-                <p className="text-xs font-bold text-gray-900">Project Manager</p>
-                <p className="text-[10px] text-gray-500">Admin Access</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </aside>
+// Wrapper component for ProjectDetail with route params
+function ProjectDetailWrapper({ projects, logs, onAnalyze }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-gray-50 h-full relative">
+  const project = projects.find(p => String(p.id) === String(id));
 
-        {selectedProject ? (
-          (() => {
-            const filteredLogs = logs.filter(l => String(l.projectId) === String(selectedProject.id));
-            return (
-              <ProjectDetail
-                project={selectedProject}
-                logs={filteredLogs}
-                onBack={handleBackToTable}
-                onAnalyze={handleAnalyzeProject}
-              />
-            );
-          })()
-        ) : selectedSimPROProject ? (
-          <SimPROProjectDetail
-            project={selectedSimPROProject}
-            logs={simproLogs.filter(l => String(l.projectId) === String(selectedSimPROProject.id))}
-            onBack={handleBackToSimPROTable}
-            onAnalyze={handleAnalyzeProject}
-          />
-        ) : (
-          <>
-            {/* Header (Responsive) */}
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 md:px-8 py-4 flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="lg:hidden flex items-center gap-2 text-indigo-600 font-bold">
-                  <LayoutDashboard className="w-5 h-5" />
-                  <span>ProjectFlow</span>
-                </div>
-                <h2 className="hidden lg:block text-xl font-bold text-gray-800 capitalize">{currentView}</h2>
-              </div>
-              <div className="flex items-center gap-3">
-                {currentView !== View.APPROVALS && (
-                  <div className="relative">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search..."
-                      className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-32 md:w-64 transition-all"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                )}
-                <button className="relative p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
-                  <Bell className="w-5 h-5" />
-                  {stats.pendingApprovals > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>}
-                </button>
-              </div>
-            </header>
+  if (!project) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg text-gray-600">Project not found</div>
+      </div>
+    );
+  }
 
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 lg:pb-8">
-              {/* Dashboard View */}
-              {currentView === View.DASHBOARD && (
-                <div className="max-w-7xl mx-auto">
-                  <DashboardStatsView stats={stats} projectStatusData={projectStatusData} projectAlerts={projectAlerts} onSelectProject={handleSelectProject}
-                  />
+  return (
+    <ProjectDetail
+      project={project}
+      logs={logs.filter(l => String(l.projectId) === String(id))}
+      onBack={() => navigate('/projects')}
+      onAnalyze={onAnalyze}
+    />
+  );
+}
 
-                  {stats.delayedProjects > 0 && (
-                    <div className="mt-8">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                          Projects Requiring Attention
-                        </h3>
-                        <button
-                          onClick={() => handleSwitchView(View.PROJECTS)}
-                          className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-                        >
-                          View All
-                        </button>
-                      </div>
-                      <div className="h-auto">
-                        <ProjectTable
-                          projects={projects.filter(p => p.status === ProjectStatus.DELAYED || p.spent > p.budget).slice(0, 5)}
-                          onSelectProject={handleSelectProject}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+// Wrapper component for SimPROProjectDetail with route params
+function SimPROProjectDetailWrapper({ projects, logs, onAnalyze }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-              {/* Projects View */}
-              {currentView === View.PROJECTS && (
-                <div className="max-w-full h-full">
-                  <ProjectTable
-                    projects={projects.filter(p =>
-                      (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-                      (p.client?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-                    )}
-                    onSelectProject={handleSelectProject}
-                  />
-                </div>
-              )}
+  const project = projects.find(p => String(p.id) === String(id));
 
-              {/* SimPRO Projects View */}
-              {currentView === View.SIMPRO_PROJECTS && (
-                <div className="max-w-full h-full">
-                  <SimPROProjectTable
-                    projects={simproProjects.filter(p =>
-                      (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-                      (p.client?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-                    )}
-                    onSelectProject={handleSelectSimPROProject}
-                  />
-                </div>
-              )}
+  if (!project) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg text-gray-600">Project not found</div>
+      </div>
+    );
+  }
 
-              {/* Approvals View */}
-              {currentView === View.APPROVALS && (
-                <div className="max-w-5xl mx-auto">
-                  <ApprovalQueue
-                    logs={logs}
-                    onApprove={handleApproveLog}
-                    onReject={handleRejectLog}
-                  />
-                </div>
-              )}
-
-              {
-                currentView === View.API_TESTING && (
-                  <div className="max-w-5xl mx-auto">
-                    <API_Testing />
-                  </div>
-                )
-              }
-            </div>
-          </>
-        )}
-
-        {/* Bottom Navigation (Mobile & Tablet - Visible below LG) */}
-        {!selectedProject && !selectedSimPROProject && (
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around p-2 z-30 pb-safe">
-            <button
-              onClick={() => handleSwitchView(View.DASHBOARD)}
-              className={`flex flex-col items-center p-2 rounded-lg w-full ${currentView === View.DASHBOARD ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500'}`}
-            >
-              <LayoutDashboard className="w-6 h-6" />
-              <span className="text-[10px] font-medium mt-1">Dashboard</span>
-            </button>
-            <button
-              onClick={() => handleSwitchView(View.PROJECTS)}
-              className={`flex flex-col items-center p-2 rounded-lg w-full ${currentView === View.PROJECTS ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500'}`}
-            >
-              <ListTodo className="w-6 h-6" />
-              <span className="text-[10px] font-medium mt-1">Projects</span>
-            </button>
-            <button
-              onClick={() => handleSwitchView(View.APPROVALS)}
-              className={`relative flex flex-col items-center p-2 rounded-lg w-full ${currentView === View.APPROVALS ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500'}`}
-            >
-              <div className="relative">
-                <ClipboardCheck className="w-6 h-6" />
-                {stats.pendingApprovals > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white"></span>}
-              </div>
-              <span className="text-[10px] font-medium mt-1">Approvals</span>
-            </button>
-          </div>
-        )}
-
-      </main>
-
-      {/* AI Analysis Modal Overlay */}
-      {(aiAnalysisResult || isAnalyzing) && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <span className="text-indigo-600">✨</span> Gemini Insights
-              </h3>
-              <button
-                onClick={() => { setAiAnalysisResult(null); setIsAnalyzing(false); }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
-
-            {isAnalyzing ? (
-              <div className="py-12 flex flex-col items-center justify-center text-gray-500">
-                <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
-                <p>Analyzing project data...</p>
-              </div>
-            ) : (
-              <div className="prose prose-sm text-gray-600 max-h-[60vh] overflow-y-auto">
-                <p className="leading-relaxed whitespace-pre-wrap">{aiAnalysisResult?.text}</p>
-              </div>
-            )}
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => { setAiAnalysisResult(null); setIsAnalyzing(false); }}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
+  return (
+    <SimPROProjectDetail
+      project={project}
+      logs={logs.filter(l => String(l.projectId) === String(id))}
+      onBack={() => navigate('/simpro-projects')}
+      onAnalyze={onAnalyze}
+    />
   );
 }
 

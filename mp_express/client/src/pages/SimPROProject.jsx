@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SimPROProjectTable } from '../components/SimPROProjectTable';
-import { SimPROProjectDetail } from '../components/SimPROProjectDetail';
 import { truncateClientName } from '../utils/stringUtils';
 
 function SimPROProjectPage() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,8 +53,9 @@ function SimPROProjectPage() {
     loadSimPROData();
   }, []);
 
-  const handleSelectProject = (project) => setSelectedProject(project);
-  const handleBack = () => setSelectedProject(null);
+  const handleSelectProject = (project) => {
+    navigate(`/simpro-projects/${project.id}`);
+  };
 
   if (loading) {
     return (
@@ -69,35 +70,24 @@ function SimPROProjectPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8">
-      {selectedProject ? (
-        <SimPROProjectDetail
-          project={selectedProject}
-          logs={logs.filter(l => String(l.projectId) === String(selectedProject.id))}
-          onBack={handleBack}
-          onAnalyze={() => {}}
+    <div className="max-w-full">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-gray-800">SimPRO Projects</h2>
+        <input
+          type="text"
+          placeholder="Search projects..."
+          className="pl-3 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
-      ) : (
-        <div className="max-w-full h-full">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-800">SimPRO Projects</h2>
-            <input
-              type="text"
-              placeholder="Search projects..."
-              className="pl-3 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <SimPROProjectTable
-            projects={projects.filter(p =>
-              (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
-              (p.client?.toLowerCase() || '').includes(searchQuery.toLowerCase())
-            )}
-            onSelectProject={handleSelectProject}
-          />
-        </div>
-      )}
+      </div>
+      <SimPROProjectTable
+        projects={projects.filter(p =>
+          (p.name?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+          (p.client?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+        )}
+        onSelectProject={handleSelectProject}
+      />
     </div>
   );
 }
