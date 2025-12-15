@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Clock, TriangleAlert } from 'lucide-react';
 import { fetchWorkers, fetchJobs, fetchProjects } from '../utils/apiUtils';
+import { useNavigate } from 'react-router-dom';
 
 const CentraliseView = () => {
   const [blockHeight] = useState(1);
@@ -16,6 +17,7 @@ const CentraliseView = () => {
   const scheduleGridScrollRef = useRef(null);
   const isScrollingRef = useRef(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const navigate = useNavigate();
 
   // Helper function to calculate duration in hours from start and end datetime
   const calculateDuration = (startDatetime, endDatetime) => {
@@ -954,7 +956,7 @@ const CentraliseView = () => {
                     )}
                     <div className="pt-2">
                       <button 
-                        onClick={() => window.open(`/projects/${selectedJob.projectId}`, '_blank')}
+                        onClick={() => navigate(`/projects/${selectedJob.projectId}`)}
                         className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
                       >
                         View Project Details
