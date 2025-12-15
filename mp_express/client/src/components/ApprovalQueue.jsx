@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Check, X, Wand2, Briefcase, History, Edit2, Save, ArrowRight } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Check, X, Wand2, Briefcase, History, Edit2, Save, ArrowRight, Clock, AlertCircle, Filter } from 'lucide-react';
 import { LogStatus } from '../types';
 import { suggestApprovalAction } from '../services/geminiService';
 
@@ -277,37 +277,78 @@ const HistoryLogCard = ({ log }) => {
 
 export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
   const [activeTab, setActiveTab] = useState('PENDING');
-
+  const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [historyProjectFilter, setHistoryProjectFilter] = useState('all');
+  
   const pendingLogs = useMemo(() => logs.filter(l => l.status === LogStatus.WAITING_APPROVAL), [logs]);
   const historyLogs = useMemo(() => logs.filter(l => l.status !== LogStatus.WAITING_APPROVAL).sort((a,b) => (b.actualEnd?.getTime() || 0) - (a.actualEnd?.getTime() || 0)), [logs]);
-
-  // Group pending only
-  const groupedPending = useMemo(() => {
-    const groups = {};
+  
+  // Get unique projects for pending
+  const pendingProjects = useMemo(() => {
+    const projectMap = new Map();
     pendingLogs.forEach(log => {
-        if (!groups[log.projectId]) {
-            groups[log.projectId] = { projectName: log.projectName, logs: [] };
-        }
-        groups[log.projectId].logs.push(log);
+      if (!projectMap.has(log.projectId)) {
+        projectMap.set(log.projectId, {
+          id: log.projectId,
+          name: log.projectName,
+          count: 0,
+          hasIssues: false
+        });
+      }
+      const project = projectMap.get(log.projectId);
+      project.count++;
+      
+      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.scheduledStart.getTime()) / 60000;
+      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.scheduledEnd.getTime()) / 60000;
+      if (startDiff > 10 || endDiff > 15) {
+        project.hasIssues = true;
+      }
     });
-    return Object.values(groups);
+    return Array.from(projectMap.values());
   }, [pendingLogs]);
+
+  // Get unique projects for history filter
+  const historyProjects = useMemo(() => {
+    const projectMap = new Map();
+    historyLogs.forEach(log => {
+      if (!projectMap.has(log.projectId)) {
+        projectMap.set(log.projectId, {
+          id: log.projectId,
+          name: log.projectName
+        });
+      }
+    });
+    return Array.from(projectMap.values());
+  }, [historyLogs]);
+
+  // Auto-select first project if none selected
+  useEffect(() => {
+    if (activeTab === 'PENDING' && pendingProjects.length > 0 && !selectedProjectId) {
+      setSelectedProjectId(pendingProjects[0].id);
+    }
+  }, [activeTab, pendingProjects, selectedProjectId]);
+
+  const selectedProjectLogs = useMemo(() => {
+    if (!selectedProjectId) return [];
+    return pendingLogs.filter(log => log.projectId === selectedProjectId);
+  }, [pendingLogs, selectedProjectId]);
+
+  const filteredHistoryLogs = useMemo(() => {
+    if (historyProjectFilter === 'all') return historyLogs;
+    return historyLogs.filter(log => log.projectId === historyProjectFilter);
+  }, [historyLogs, historyProjectFilter]);
+
+  const selectedProject = pendingProjects.find(p => p.id === selectedProjectId);
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      <div className="flex justify-between items-end">
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Approvals & Adjustments</h2>
-            <p className="text-gray-500 text-sm">Review, adjust, and approve worker timesheets.</p>
-          </div>
-      </div>
-
       {/* Tabs */}
       <div className="border-b border-gray-200 flex gap-6">
           <button 
              onClick={() => setActiveTab('PENDING')}
              className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'PENDING' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
           >
+            <Clock className="w-4 h-4" />
               Pending Reviews 
               {pendingLogs.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{pendingLogs.length}</span>}
           </button>
@@ -315,8 +356,9 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
              onClick={() => setActiveTab('HISTORY')}
              className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'HISTORY' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
           >
-              Approval History
-              <History className="w-4 h-4" />
+            <History className="w-4 h-4" />
+               History
+              {historyLogs.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{historyLogs.length}</span>}
           </button>
       </div>
 
@@ -331,41 +373,134 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
                     <p className="text-gray-500 mt-2">No pending time logs to approve.</p>
                 </div>
             ) : (
-                groupedPending.map((group) => (
-                    <div key={group.projectName} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-                            <div className="flex items-center gap-2 max-w-[80%]">
-                                <Briefcase className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                <h3 className="font-bold text-gray-800 truncate">{group.projectName}</h3>
-                                <span className="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0">
-                                    {group.logs.length}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                            {group.logs.map(log => (
-                                <LogApprovalCard key={log.id} log={log} onApprove={onApprove} onReject={onReject} />
-                            ))}
-                        </div>
+                <div className="flex gap-6">
+                  {/* Left Sidebar - Project List */}
+                  <div className="w-80 flex-shrink-0">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden sticky top-4">
+                      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-gray-200">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                          <Briefcase className="w-4 h-4 text-indigo-600" />
+                          Projects
+                        </h3>
+                      </div>
+                      
+                      <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
+                        {pendingProjects.length === 0 ? (
+                          <div className="p-8 text-center text-gray-400">
+                            <Check className="w-12 h-12 mx-auto mb-2 text-green-400" />
+                            <p className="text-sm">All caught up!</p>
+                          </div>
+                        ) : (
+                          pendingProjects.map(project => (
+                            <button
+                              key={project.id}
+                              onClick={() => setSelectedProjectId(project.id)}
+                              className={`w-full text-left p-4 transition-colors ${
+                                selectedProjectId === project.id
+                                  ? 'bg-indigo-50 border-l-4 border-indigo-600'
+                                  : 'hover:bg-gray-50 border-l-4 border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-gray-900 truncate">{project.name}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {project.count} {project.count === 1 ? 'entry' : 'entries'}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {project.hasIssues && (
+                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                                  )}
+                                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                    selectedProjectId === project.id
+                                      ? 'bg-indigo-600 text-white'
+                                      : 'bg-gray-200 text-gray-700'
+                                  }`}>
+                                    {project.count}
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
                     </div>
-                ))
+                  </div>
+
+                  {/* Right Side - Selected Project Details */}
+                  <div className="flex-1">
+                    {selectedProjectId && selectedProject ? (
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">{selectedProject.name}</h3>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {selectedProjectLogs.length} time {selectedProjectLogs.length === 1 ? 'entry' : 'entries'} pending approval
+                              </p>
+                            </div>
+                            {selectedProject.hasIssues && (
+                              <div className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                Has Issues
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="divide-y divide-gray-100">
+                          {selectedProjectLogs.map(log => (
+                            <LogApprovalCard key={log.id} log={log} onApprove={onApprove} onReject={onReject} />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+                        <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <p className="text-gray-500">Select a project to view time entries</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
             )}
           </>
       )}
 
       {activeTab === 'HISTORY' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="space-y-4">
+            {/* Filter */}
+            <div className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 p-4">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <label className="text-sm font-medium text-gray-700">Filter by Project:</label>
+              <select
+                value={historyProjectFilter}
+                onChange={(e) => setHistoryProjectFilter(e.target.value)}
+                className="flex-1 max-w-xs px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Projects ({historyLogs.length})</option>
+                {historyProjects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} ({historyLogs.filter(l => l.projectId === project.id).length})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* History Logs */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                  <h3 className="font-bold text-gray-800">Recent Decisions</h3>
+                <h3 className="font-bold text-gray-800">Recent Decisions</h3>
               </div>
               <div className="divide-y divide-gray-100">
-                  {historyLogs.slice(0, 20).map(log => (
-                      <HistoryLogCard key={log.id} log={log} />
-                  ))}
-                  {historyLogs.length === 0 && (
-                      <div className="p-8 text-center text-gray-400">No history available yet.</div>
-                  )}
+                {filteredHistoryLogs.slice(0, 20).map(log => (
+                  <HistoryLogCard key={log.id} log={log} />
+                ))}
+                {filteredHistoryLogs.length === 0 && (
+                  <div className="p-8 text-center text-gray-400">No history available yet.</div>
+                )}
               </div>
+            </div>
           </div>
       )}
     </div>

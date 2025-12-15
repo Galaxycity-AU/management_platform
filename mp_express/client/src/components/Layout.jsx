@@ -37,6 +37,7 @@ export const Layout = ({ children }) => {
       badge: stats?.pendingApprovals > 0 ? stats.pendingApprovals : null 
     },
     { path: '/api-testing', icon: Code, label: 'API Testing' },
+    { path: '/test-approval', icon: ClipboardCheck, label: 'Test Approval' },
   ];
 
   return (
