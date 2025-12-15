@@ -11,29 +11,29 @@ import { DashboardStatsView } from './components/DashboardStats';
 import API_Testing from './components/API_Testing';
 import { truncateClientName } from './utils/stringUtils';
 
-enum View {
-  DASHBOARD = 'dashboard',
-  PROJECTS = 'projects',
-  SIMPRO_PROJECTS = 'simpro-projects',
-  APPROVALS = 'approvals',
-  API_TESTING = 'api-testing',
-}
+const View = {
+  DASHBOARD: 'dashboard',
+  PROJECTS: 'projects',
+  SIMPRO_PROJECTS: 'simpro-projects',
+  APPROVALS: 'approvals',
+  API_TESTING: 'api-testing',
+};
 
 function App() {
-  const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [logs, setLogs] = useState<WorkerLog[]>([]);
-  const [simproProjects, setSimproProjects] = useState<Project[]>([]);
-  const [simproLogs, setSimproLogs] = useState<WorkerLog[]>([]);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [selectedSimPROProject, setSelectedSimPROProject] = useState<Project | null>(null);
+  const [currentView, setCurrentView] = useState(View.DASHBOARD);
+  const [projects, setProjects] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [simproProjects, setSimproProjects] = useState([]);
+  const [simproLogs, setSimproLogs] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedSimPROProject, setSelectedSimPROProject] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<{ id: string, text: string } | null>(null);
+  const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Sidebar collapse state with localStorage persistence
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     return saved ? JSON.parse(saved) : false;
   });
@@ -44,37 +44,34 @@ function App() {
     localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
   };
 
-  // Load SimPRO data from JSON file (no database connection - pure JSON array)
+  // Load SimPRO data from JSON file
   const loadSimPROData = async () => {
     try {
       const response = await fetch('/api/simpro/projects');
       const data = await response.json();
 
-      // Convert date strings to Date objects for projects
-      const projectsWithDates: Project[] = data.projects.map((p: any) => ({
+      const projectsWithDates = data.projects.map((p) => ({
         ...p,
         client: truncateClientName(p.client || ''),
         scheduledStart: p.scheduledStart ? new Date(p.scheduledStart) : new Date(),
         scheduledEnd: p.scheduledEnd ? new Date(p.scheduledEnd) : new Date(),
-        status: p.status as ProjectStatus,
-        schedules: p.schedules || [], // Include schedules array
+        status: p.status,
+        schedules: p.schedules || [],
       }));
 
-      // Convert date strings to Date objects for logs
-      const logsWithDates: WorkerLog[] = data.logs.map((l: any) => ({
+      const logsWithDates = data.logs.map((l) => ({
         ...l,
         scheduledStart: new Date(l.scheduledStart),
         scheduledEnd: new Date(l.scheduledEnd),
         actualStart: l.actualStart ? new Date(l.actualStart) : null,
         actualEnd: l.actualEnd ? new Date(l.actualEnd) : null,
-        status: l.status as LogStatus,
+        status: l.status,
       }));
 
       setSimproProjects(projectsWithDates);
       setSimproLogs(logsWithDates);
     } catch (error) {
       console.error('Error loading SimPRO data:', error);
-      // Fallback to empty arrays if JSON file fails to load
       setSimproProjects([]);
       setSimproLogs([]);
     }
@@ -82,10 +79,8 @@ function App() {
 
   const loadDBData = async () => {
     try {
-      // Use Next.js API routes (relative URLs)
       const apiBaseUrl = '/api';
 
-      console.log('Fetching projects from:', `${apiBaseUrl}/projects`);
       const fetchProjects = await fetch(`${apiBaseUrl}/projects`);
 
       if (!fetchProjects.ok) {
@@ -93,18 +88,15 @@ function App() {
       }
 
       const projectsData = await fetchProjects.json();
-      console.log('Projects fetched:', projectsData);
 
-      // Safe date converter
-      const toSafeDate = (d: any): Date | null => {
+      const toSafeDate = (d) => {
         if (d == null) return null;
         if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
         const parsed = new Date(d);
         return isNaN(parsed.getTime()) ? null : parsed;
       };
 
-      // Transform the data from new schema
-      const projectData: Project[] = projectsData.map((p: any) => ({
+      const projectData = projectsData.map((p) => ({
         ...p,
         deadline: toSafeDate(p.deadline),
         spent: p.spent || 0,
@@ -112,10 +104,8 @@ function App() {
         progress: p.progress || 0,
       }));
 
-      console.log('Transformed projects:', projectData);
       setProjects(projectData);
 
-      // Fetch jobs and workers to create logs
       try {
         const [fetchJobs, fetchWorkers] = await Promise.all([
           fetch(`${apiBaseUrl}/jobs`),
@@ -126,34 +116,24 @@ function App() {
           const jobsData = await fetchJobs.json();
           const workersData = await fetchWorkers.json();
 
-          console.log('Jobs data:', jobsData.length, 'jobs');
-          console.log('Workers data:', workersData.length, 'workers');
+          const workersMap = new Map(workersData.map((w) => [w.id, w]));
+          const projectsMap = new Map(projectData.map((p) => [Number(p.id), p]));
 
-          // Create a map of workers for quick lookup
-          const workersMap = new Map(workersData.map((w: any) => [w.id, w]));
-
-          // Create a map of projects for quick lookup
-          const projectsMap = new Map(projectData.map((p: Project) => [Number(p.id), p]));
-
-          // Transform jobs into WorkerLog format
-          const logsData: WorkerLog[] = jobsData
-            .filter((job: any) => {
-              // Only include jobs with valid scheduled times
+          const logsData = jobsData
+            .filter((job) => {
               const startTime = job.actual_start || job.modified_start || job.scheduled_start;
               const endTime = job.actual_end || job.modified_end || job.scheduled_end;
               return startTime && endTime;
             })
-            .map((job: any) => {
-              const worker: any = workersMap.get(job.worker_id);
+            .map((job) => {
+              const worker = workersMap.get(job.worker_id);
               const project = projectsMap.get(job.project_id);
 
-              // Determine which times to use (prioritize actual > modified > scheduled)
               const scheduledStart = new Date(job.scheduled_start);
               const scheduledEnd = new Date(job.scheduled_end);
               const actualStart = job.actual_start ? new Date(job.actual_start) : null;
               const actualEnd = job.actual_end ? new Date(job.actual_end) : null;
 
-              // Map job status to LogStatus
               const logStatus = job.status === 'schedule' ? LogStatus.SCHEDULE :
                 job.status === 'active' ? LogStatus.ACTIVE :
                   job.status === 'approved' ? LogStatus.APPROVED :
@@ -181,14 +161,11 @@ function App() {
               };
             });
 
-          console.log('Transformed logs:', logsData.length, 'logs');
-          console.log('Sample log:', logsData[0]);
           setLogs(logsData);
 
-          // Calculate progress for each project based on approved jobs
           const updatedProjects = projectData.map(project => {
-            const projectJobs = jobsData.filter((job: any) => job.project_id === project.id);
-            const completedJobs = projectJobs.filter((job: any) => job.status === 'approved').length;
+            const projectJobs = jobsData.filter((job) => job.project_id === project.id);
+            const completedJobs = projectJobs.filter((job) => job.status === 'approved').length;
             const progress = projectJobs.length > 0 ? (completedJobs / projectJobs.length) * 100 : 0;
 
             return {
@@ -211,7 +188,6 @@ function App() {
     }
   };
 
-  // Fetch real data from backend API
   useEffect(() => {
     loadDBData();
     loadSimPROData();
@@ -234,14 +210,14 @@ function App() {
 
   const projectAlerts = projects.map(p => ({
     ...p,
-    alerts: p.id % 2 === 0 ? true : false, // Dummy alert condition for example
-    lateCase: p.id % 2 === 0 ? p.id + p.id : 0, // Dummy reason
-    overTime: p.id % 3 === 0 ? p.id * 2 : 0, // Dummy reason
-    overBudget: p.id == 8 ? p.id * 3 : 0, // Dummy reason
+    alerts: p.id % 2 === 0 ? true : false,
+    lateCase: p.id % 2 === 0 ? p.id + p.id : 0,
+    overTime: p.id % 3 === 0 ? p.id * 2 : 0,
+    overBudget: p.id == 8 ? p.id * 3 : 0,
   })).filter(p => p.alerts);
 
   // Handlers
-  const handleApproveLog = (id: string, adjustedStart?: Date, adjustedEnd?: Date, reason?: string) => {
+  const handleApproveLog = (id, adjustedStart, adjustedEnd, reason) => {
     setLogs(prev => prev.map(l => {
       if (l.id === id) {
         return {
@@ -249,7 +225,6 @@ function App() {
           status: LogStatus.APPROVED,
           actualStart: adjustedStart || l.actualStart,
           actualEnd: adjustedEnd || l.actualEnd,
-          // If adjusted, we keep the adjustment reason
           adjustmentReason: reason,
           approvedAt: new Date(),
           approvedBy: 'Current User'
@@ -259,11 +234,11 @@ function App() {
     }));
   };
 
-  const handleRejectLog = (id: string) => {
+  const handleRejectLog = (id) => {
     setLogs(prev => prev.map(l => l.id === id ? { ...l, status: LogStatus.REJECTED, approvedAt: new Date() } : l));
   };
 
-  const handleAnalyzeProject = async (project: Project) => {
+  const handleAnalyzeProject = async (project) => {
     setIsAnalyzing(true);
     setAiAnalysisResult(null);
     const projectLogs = logs.filter(l => l.projectId === project.id);
@@ -272,12 +247,12 @@ function App() {
     setIsAnalyzing(false);
   };
 
-  const handleSelectProject = (project: Project) => {
+  const handleSelectProject = (project) => {
     setSelectedProject(project);
     setCurrentView(View.PROJECTS);
   };
 
-  const handleSelectSimPROProject = (project: Project) => {
+  const handleSelectSimPROProject = (project) => {
     setSelectedSimPROProject(project);
     setCurrentView(View.SIMPRO_PROJECTS);
   };
@@ -290,8 +265,7 @@ function App() {
     setSelectedSimPROProject(null);
   };
 
-  // Switch views resets selection
-  const handleSwitchView = (view: View) => {
+  const handleSwitchView = (view) => {
     setCurrentView(view);
     setSelectedProject(null);
     setSelectedSimPROProject(null);
@@ -396,14 +370,9 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 bg-gray-50 h-full relative">
 
-        {/* Render Logic: Detail View takes over Full Screen if selected */}
         {selectedProject ? (
           (() => {
             const filteredLogs = logs.filter(l => String(l.projectId) === String(selectedProject.id));
-            console.log('App.tsx - Filtering logs for project:', selectedProject.id);
-            console.log('App.tsx - Total logs:', logs.length);
-            console.log('App.tsx - Sample log projectId:', logs.length > 0 ? logs[0].projectId : 'none', 'Type:', logs.length > 0 ? typeof logs[0].projectId : 'none');
-            console.log('App.tsx - Filtered logs for project:', filteredLogs.length);
             return (
               <ProjectDetail
                 project={selectedProject}
@@ -425,7 +394,6 @@ function App() {
             {/* Header (Responsive) */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 md:px-8 py-4 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-4">
-                {/* Mobile/Tablet Logo/Title shown only on screens smaller than LG */}
                 <div className="lg:hidden flex items-center gap-2 text-indigo-600 font-bold">
                   <LayoutDashboard className="w-5 h-5" />
                   <span>ProjectFlow</span>
@@ -473,7 +441,6 @@ function App() {
                           View All
                         </button>
                       </div>
-                      {/* We reuse the new table but only for Delayed projects */}
                       <div className="h-auto">
                         <ProjectTable
                           projects={projects.filter(p => p.status === ProjectStatus.DELAYED || p.spent > p.budget).slice(0, 5)}

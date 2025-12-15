@@ -1,0 +1,21 @@
+{
+  "name": "projectflow-server",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Express backend for ProjectFlow",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node scripts/seed.mjs"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "mysql2": "^3.15.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0"
+  }
+}

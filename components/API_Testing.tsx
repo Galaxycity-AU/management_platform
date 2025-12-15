@@ -141,7 +141,7 @@ const App: React.FC = () => {
         // Batch update simproProjects.json
         if (newProjects.length > 0) {
           try {
-            const response = await fetch('http://localhost:3001/api/simpro/projects/batch', {
+            const response = await fetch('/api/simpro/projects/batch', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -184,7 +184,7 @@ const App: React.FC = () => {
       // Update schedules for all jobs (both existing and newly created)
       if (Object.keys(jobSchedulesMap).length > 0) {
         try {
-          const response = await fetch('http://localhost:3001/api/simpro/projects/schedules', {
+          const response = await fetch('/api/simpro/projects/schedules', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
