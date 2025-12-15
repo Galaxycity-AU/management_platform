@@ -14,11 +14,6 @@ export default defineConfig(({ mode }) => {
             target: 'http://localhost:3001',
             changeOrigin: true,
             rewrite: (path) => path.replace(/^\/api/, '')
-          },
-          // Proxy direct routes (projects, jobs, workers, approvals, health)
-          '^/(projects|jobs|workers|approvals|health)': {
-            target: 'http://localhost:3001',
-            changeOrigin: true
           }
         }
       },

@@ -110,9 +110,9 @@ const API_Testing = () => {
       return;
     }
     setLoading(true);
-    setDisplay(`Testing /jobs/${inputValue} ...`);
+    setDisplay(`Testing /api/jobs/${inputValue} ...`);
     try {
-      const response = await fetch(`/jobs/${inputValue}`);
+      const response = await fetch(`/api/jobs/${inputValue}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Request failed');
       setDisplay(`Success: ${JSON.stringify(data, null, 2)}`);

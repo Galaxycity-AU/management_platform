@@ -13,8 +13,8 @@ export const API_BASE_URL = import.meta.env.PROD
   : '/api/simpro';
   
 export const DB_API_BASE_URL = import.meta.env.PROD
-  ? `${import.meta.env.VITE_API_URL || `${API_HOST}:${API_PORT}`}`
-  : ''; // Use relative URLs in dev (Vite proxy handles routes like /projects, /jobs, etc.)
+  ? `${import.meta.env.VITE_API_URL || `${API_HOST}:${API_PORT}`}/api`
+  : '/api'; // Use /api prefix for all API calls
 
 /**
  * Make an API call to the SimPRO backend
@@ -42,7 +42,7 @@ export async function callAPI(endpoint) {
 export async function callDBAPI(endpoint) {
   try {
     console.log(`Fetching from: ${DB_API_BASE_URL}${endpoint}`);
-    const response = await fetch(`${DB_API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${DB_API_BASE_URL}/api/${endpoint}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
