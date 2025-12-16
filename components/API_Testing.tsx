@@ -241,58 +241,26 @@ const App: React.FC = () => {
     debugMessages.push(debugLog('Starting getLog process'));
     
     try {
-      // Step 1: Fetch all logs from API
+      // Step 1: Fetch processed logs from API
       debugMessages.push(debugLog('Fetching logs from API...'));
       const result = await callAPI(`/logs/mobileStatus`);
-      const logData = Array.isArray(result) ? result : (result.data || result.items || []);
-      debugMessages.push(debugLog(`Fetched ${logData.length} logs from API`));
       
-      // Step 2: Get last processed ID and filter new logs
-      const lastProcessedId = getLastProcessedId();
-      debugMessages.push(debugLog(`Last processed ID: ${lastProcessedId}`));
+      // API returns: { logs, projects, lastProcessedId, tableRows }
+      const allLogs = result.logs || [];
+      const processedProjectsData = result.projects || [];
+      const highestId = result.lastProcessedId || 0;
+      const tableData = result.tableRows || [];
       
-      const newLogs = logData.filter((log: any) => {
-        const logId = log.ID || 0;
-        return logId > lastProcessedId;
-      });
-      debugMessages.push(debugLog(`Found ${newLogs.length} new logs (ID > ${lastProcessedId})`));
-      
-      // Step 3: Get existing logs and merge with new logs
-      const existingLogs = getStoredLogs();
-      debugMessages.push(debugLog(`Retrieved ${existingLogs.length} existing logs from storage`));
-      
-      // Create a map to avoid duplicates (keyed by log ID)
-      const logMap = new Map<number, any>();
-      
-      // Add existing logs to map
-      existingLogs.forEach((log: any) => {
-        const logId = log.ID || 0;
-        if (logId > 0) {
-          logMap.set(logId, log);
-        }
-      });
-      
-      // Add new logs to map (will overwrite if duplicate ID exists)
-      newLogs.forEach((log: any) => {
-        const logId = log.ID || 0;
-        if (logId > 0) {
-          logMap.set(logId, log);
-        }
-      });
-      
-      // Convert map back to array
-      const allLogs = Array.from(logMap.values());
-      debugMessages.push(debugLog(`Total logs after merge: ${allLogs.length} (${existingLogs.length} existing + ${newLogs.length} new)`));
-      
-      // Step 4: Save merged logs
-      saveLogs(allLogs);
-      
-      // Step 5: Process ALL logs to recalculate project states
-      debugMessages.push(debugLog('Processing all logs by project...'));
-      const processedProjectsData = processLogsByProject(allLogs);
+      debugMessages.push(debugLog(`Fetched ${allLogs.length} logs from API`));
       debugMessages.push(debugLog(`Processed ${processedProjectsData.length} projects`));
+      debugMessages.push(debugLog(`Last processed ID: ${highestId}`));
       
-      // Store processed projects for the view
+      // Step 2: Save logs to local storage for client-side persistence
+      saveLogs(allLogs);
+      saveLastProcessedId(highestId);
+      setLastProcessedId(highestId);
+      
+      // Step 3: Store processed projects for the view
       setProcessedProjects(processedProjectsData);
       setAllLogsCount(allLogs.length);
       setLastUpdate(new Date());
@@ -304,21 +272,7 @@ const App: React.FC = () => {
         ));
       });
       
-      // Step 6: Update last processed ID to the highest ID
-      const allLogIds = allLogs.map((log: any) => log.ID || 0).filter((id: number) => id > 0);
-      const highestId = allLogIds.length > 0 ? Math.max(...allLogIds) : lastProcessedId;
-      
-      if (highestId > lastProcessedId) {
-        saveLastProcessedId(highestId);
-        setLastProcessedId(highestId);
-        debugMessages.push(debugLog(`Updated last processed ID from ${lastProcessedId} to ${highestId}`));
-      } else {
-        setLastProcessedId(highestId);
-        debugMessages.push(debugLog(`Last processed ID unchanged: ${highestId}`));
-      }
-      
-      // Display table with all logs
-      const tableData = prepareLogTableData(allLogs);
+      // Step 4: Display table with all logs
       setLogTableRows(tableData);
       setShowLogTable(true);
       setShowEventTracking(true);
