@@ -88,6 +88,12 @@ export async function fetchProjects() {
   return await callDBAPI('/projects');
 }
 
+/** Fetch all approvals from database
+ */
+export async function fetchApprovals() {
+  return await callDBAPI('/approvals');
+}
+
 /**
  * Debug logging utility with timestamp
  */

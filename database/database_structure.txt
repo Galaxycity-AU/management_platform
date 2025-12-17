@@ -1,0 +1,32 @@
+project
+- project id
+- name
+- description
+- deadline
+- status
+- client
+- manager
+
+jobs
+- project id
+- worker id
+- job id
+- schedule start time
+- schedule end time
+- actual start time
+- actual end time
+- modified start time
+- modified end time
+- status
+
+workers 
+- worker id
+- worker name
+- worker position
+- worker email
+- worker phone number
+
+approval
+- approver id
+- job id
+- comments

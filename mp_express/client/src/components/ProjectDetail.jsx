@@ -438,18 +438,18 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
         schedStart.setHours(0, 0, 0, 0);
         const viewDate = new Date(currentDate);
         viewDate.setHours(0, 0, 0, 0);
-        
+
         // Include if scheduled start is on the selected date
         const startsOnDate = schedStart.getTime() === viewDate.getTime();
-        
-        // Include if it's an active shift that started before and hasn't ended yet
-        const isOngoingFromBefore = l.status === LogStatus.ACTIVE && 
-                                   l.actualStart &&
-                                   !l.actualEnd && 
-                                   schedStart < viewDate;
 
-        const todayIncludeOngoing = isToday(viewDate) ? isOngoingFromBefore : null;
-        
+        // Include if it's an active shift that started before and hasn't ended yet
+        const isOngoingFromBefore = l.status === LogStatus.ACTIVE &&
+            l.actualStart &&
+            !l.actualEnd &&
+            schedStart < viewDate;
+
+        const todayIncludeOngoing = viewDate < new Date() ? isOngoingFromBefore : null;
+
         return startsOnDate || todayIncludeOngoing;
     });
 
@@ -460,23 +460,32 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
     const notStarted = displayLogs.filter(l => !l.actualStart).length;
 
     // Calculate planned vs actual hours for the SELECTED date
-    const plannedHours = displayLogs.reduce((sum, l) => {
+    const viewDate = new Date(currentDate);
+    const startofDay = new Date(viewDate);
+    startofDay.setHours(0, 0, 0, 0);
+    const endofDay = new Date(viewDate);
+    endofDay.setHours(23, 59, 59, 999);
+    const plannedHours = displayLogs.filter(l => l.scheduledStart >= startofDay && l.scheduledEnd <= endofDay).reduce((sum, l) => {
         const hours = (l.scheduledEnd.getTime() - l.scheduledStart.getTime()) / (1000 * 60 * 60);
         return sum + hours;
     }, 0);
 
     const loggedHours = displayLogs.reduce((sum, l) => {
-        if (l.actualStart && l.actualEnd) {
-            const hours = (l.actualEnd.getTime() - l.actualStart.getTime()) / (1000 * 60 * 60);
-            return sum + hours;
-        } else if (l.actualStart && !l.actualEnd && isToday(currentDate)) {
-            // Still in progress (only for today)
-            const now = new Date();
-            const hours = (now.getTime() - l.actualStart.getTime()) / (1000 * 60 * 60);
-            return sum + hours;
-        }
-        return sum;
+        if (!l.actualStart) return sum;
+
+        const actualStart = new Date(l.actualStart);
+        const actualEnd = l.actualEnd ? new Date(l.actualEnd) : new Date();
+
+        // Determine overlap with selected day
+        const effectiveStart = actualStart > startofDay ? actualStart : startofDay;
+        const effectiveEnd = actualEnd < endofDay ? actualEnd : endofDay;
+
+        if (effectiveEnd <= effectiveStart) return sum;
+
+        const hours = (effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60);
+        return sum + hours;
     }, 0);
+
 
     // Financial Data Mockup
     const financeData = [

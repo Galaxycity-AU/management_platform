@@ -455,15 +455,14 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
         // Include if scheduled start is on the selected date
         const startsOnDate = schedStart.getTime() === viewDate.getTime();
         
-        // Include if it's an active shift that started before and hasn't ended yet
-        const isOngoingFromBefore = l.status === LogStatus.ACTIVE && 
-                                   l.actualStart &&
-                                   !l.actualEnd && 
-                                   schedStart < viewDate;
-
-        const todayIncludeOngoing = isToday(viewDate) ? isOngoingFromBefore : null;
+        // Include if it's an active shift that started before the selected date and hasn't ended yet
+        // OR if it ended after the start of the selected date
+        const isOngoingOrSpanning = l.status === LogStatus.ACTIVE && 
+                                    l.actualStart &&
+                                    schedStart < viewDate &&
+                                    !l.actualEnd;  // Still ongoing, no end time
         
-        return startsOnDate || todayIncludeOngoing;
+        return startsOnDate || isOngoingOrSpanning;
     });
 
     // Calculate staffing summary for the SELECTED date (not just today)
@@ -482,7 +481,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
         if (l.actualStart && l.actualEnd) {
             const hours = (l.actualEnd.getTime() - l.actualStart.getTime()) / (1000 * 60 * 60);
             return sum + hours;
-        } else if (l.actualStart && !l.actualEnd && isToday(currentDate)) {
+        }
+         else if (l.actualStart && !l.actualEnd && isToday(currentDate)) {
             // Still in progress (only for today)
             const now = new Date();
             const hours = (now.getTime() - l.actualStart.getTime()) / (1000 * 60 * 60);
@@ -619,7 +619,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
                                     <div className="h-8 w-px bg-gray-200"></div>
                                     <div>
                                         <div className="text-xs text-gray-500 mb-1">Logged</div>
-                                        <span className="text-2xl font-bold text-indigo-600">{Math.round(loggedHours)}h</span>
+                                        <span className="text-2xl font-bold text-indigo-600">{0}h</span>
                                     </div>
                                 </div>
                                 <div className="text-right">

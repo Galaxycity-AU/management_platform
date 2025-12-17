@@ -109,7 +109,7 @@ export const generateMockData = (): { projects: Project[]; logs: WorkerLog[] } =
         }
 
         const isPending = !!actualLogEnd && Math.random() > 0.6;
-        const logStatus = isPending ? LogStatus.PENDING : LogStatus.APPROVED;
+        const logStatus = isPending ? LogStatus.WAITING_APPROVAL : LogStatus.APPROVED;
 
         // Create the log object
         const log: WorkerLog = {

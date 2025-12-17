@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApprovalQueue } from '../components/ApprovalQueue';
-import { fetchJobs, fetchWorkers, fetchProjects } from '../utils/apiUtils';
+import { fetchJobs, fetchWorkers, fetchProjects, fetchApprovals } from '../utils/apiUtils';
 import { LogStatus } from '../types';
 
 function ApprovalsPage() {
@@ -14,15 +14,17 @@ function ApprovalsPage() {
             try {
                 setLoading(true);
                 setError(null);
-                const [jobsData, workersData, projectsData] = await Promise.all([
+                const [jobsData, workersData, projectsData, approvalsData] = await Promise.all([
                     fetchJobs(),
                     fetchWorkers(),
-                    fetchProjects()
+                    fetchProjects(),
+                    fetchApprovals()
                 ]);
 
                 // Transform jobs to logs
                 const workersMap = new Map(workersData.map((w) => [w.id, w]));
                 const projectsMap = new Map(projectsData.map((p) => [Number(p.id), p]));
+                const approvalsMap = new Map(approvalsData.map((a) => [a.job_id, a]));
 
                 const logsData = jobsData
                     .filter((job) => {
@@ -56,11 +58,11 @@ function ApprovalsPage() {
                             scheduledEnd,
                             actualStart,
                             actualEnd,
-                            originalActualStart: actualStart,
-                            originalActualEnd: actualEnd,
+                            editStartTime: job.modified_start ? new Date(job.modified_start) : null,
+                            editEndTime: job.modified_end ? new Date(job.modified_end) : null,
+                            editReason: approvalsMap.get(job.id)?.comments || null,
                             status: logStatus,
                             notes: `Job #${job.id}`,
-                            adjustmentReason: job.modified_start ? 'Job rescheduled' : undefined,
                             approvedAt: actualEnd || undefined,
                             approvedBy: actualEnd ? 'System' : undefined
                         };
@@ -85,9 +87,9 @@ function ApprovalsPage() {
                 return {
                     ...l,
                     status: LogStatus.APPROVED,
-                    actualStart: adjustedStart || l.actualStart,
-                    actualEnd: adjustedEnd || l.actualEnd,
-                    adjustmentReason: reason,
+                    editStartTime: adjustedStart || l.actualStart,
+                    editEndTime: adjustedEnd || l.actualEnd,
+                    editReason: reason,
                     approvedAt: new Date(),
                     approvedBy: 'Current User'
                 };
@@ -98,13 +100,14 @@ function ApprovalsPage() {
         console.log('Approve log:', id, { adjustedStart, adjustedEnd, reason });
     };
 
-    const handleRejectLog = (id) => {
+    const handleRejectLog = (id, rejectReason) => {
         setLogs(prev => prev.map(l => {
             if (l.id === id) {
                 return {
                     ...l,
                     status: LogStatus.REJECTED,
-                    approvedAt: new Date()
+                    approvedAt: new Date(),
+                    editReason: rejectReason
                 };
             }
             return l;

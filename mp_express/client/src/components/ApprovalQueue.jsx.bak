@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, act } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Check, X, Briefcase, History, Edit2, Save, ArrowRight, Clock, 
   AlertCircle, Filter, RotateCcw, Calendar, ChevronRight, Zap,
@@ -98,8 +98,33 @@ const TimelineComparison = ({ log }) => {
             </div>
           ) : null
         }
+        {/* {
+          log.editEndTime && log.editStartTime && (
+            <div
+              className="absolute top-6 h-3.5 bg-red-400/30 border border-red-300 border-dashed rounded-md z-2"
+              style={{
+                left: `${getPos(log.editStartTime)}%`,
+                width: `${getWidth(log.editStartTime, log.editEndTime)}%`
+              }}
+              title={`Original Claim: ${log.editEndTime.toLocaleTimeString()}`}
+            ></div>
+          )
+        } */}
+
+        {/* Original Claimed Time (Ghost Bar) - Only if different */}
+        {/* {isHistory && log.editEndTime && log.editEndTime.getTime() !== actEnd.getTime() && (
+            <div 
+                className="absolute top-6 h-3.5 bg-red-200/50 border border-red-300 border-dashed rounded-md z-0"
+                style={{ 
+                    left: `${getPos(log.editStartTime || actStart)}%`, 
+                    width: `${getWidth(log.editStartTime || actStart, log.editEndTime)}%` 
+                }}
+                title={`Original Claim: ${log.editEndTime.toLocaleTimeString()}`}
+            ></div>
+        )} */}
 
         <span className={`absolute top-6 text-[9px] font-bold ml-1 ${isOvertime ? 'text-amber-600' : 'text-indigo-600'}`} style={{ left: `${getPos(actEnd)}%` }}>
+          {/* {isHistory ? 'Adjusted' : 'Actual'} */}
         </span>
       </div>
     </div>
