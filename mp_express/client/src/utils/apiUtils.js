@@ -19,9 +19,9 @@ export const DB_API_BASE_URL = import.meta.env.PROD
 /**
  * Make an API call to the SimPRO backend
  */
-export async function callAPI(endpoint) {
+export async function callAPI(type,endpoint) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    method: 'GET',
+    method: type,
     headers: {
       'Content-Type': 'application/json',
     },
@@ -42,7 +42,7 @@ export async function callAPI(endpoint) {
 export async function callDBAPI(endpoint) {
   try {
     console.log(`Fetching from: ${DB_API_BASE_URL}${endpoint}`);
-    const response = await fetch(`${DB_API_BASE_URL}/api/${endpoint}`, {
+    const response = await fetch(`${DB_API_BASE_URL}${endpoint}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

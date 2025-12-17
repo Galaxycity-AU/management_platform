@@ -97,12 +97,6 @@ export const EventTrackingView = ({
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Started:</span>
-                    <span className="ml-2 font-semibold text-gray-900">
-                      {formatTime(project.startTime)}
-                    </span>
-                  </div>
-                  <div>
                     <span className="text-gray-600">Workers:</span>
                     <span className="ml-2 font-semibold text-gray-900">
                       {project.workerCount}
@@ -117,47 +111,99 @@ export const EventTrackingView = ({
                 </div>
               </div>
 
-              {/* Workers */}
+              {/* Workers and Work Orders */}
               <div className="p-4">
                 <div className="space-y-3">
-                  {project.workers.map((worker) => (
-                    <div 
-                      key={worker.id}
-                      className={`flex items-center justify-between p-3 rounded-lg transition ${
-                        worker.isActivelyWorking 
-                          ? 'bg-green-50 border-2 border-green-200' 
-                          : 'bg-gray-50 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold relative ${
-                          worker.isActivelyWorking ? 'bg-green-500' : 'bg-blue-500'
-                        }`}>
-                          {worker.name.split(' ').map(n => n[0]).join('')}
-                          {worker.isActivelyWorking && (
-                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></span>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">{worker.name}</div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <span style={{ color: worker.statusColor }}>{worker.status}</span>
+                  {project.workers.flatMap((worker) => {
+                    // If worker has work orders, show one row per work order
+                    if (worker.workOrders && worker.workOrders.length > 0) {
+                      return worker.workOrders.map((workOrder, woIndex) => (
+                        <div 
+                          key={`${worker.workerId}-${workOrder.workOrderId ?? `no-wo-${woIndex}`}`}
+                          className={`flex items-center justify-between p-3 rounded-lg transition ${
+                            worker.isActivelyWorking 
+                              ? 'bg-green-50 border-2 border-green-200' 
+                              : 'bg-gray-50 hover:bg-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold relative ${
+                              worker.isActivelyWorking ? 'bg-green-500' : 'bg-blue-500'
+                            }`}>
+                              {worker.workerName && worker.workerName.split(' ').map(n => n[0]).join('')}
+                              {worker.isActivelyWorking && (
+                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></span>
+                              )}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{worker.workerName || 'Unknown Worker'}</div>
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                {workOrder.workOrderId !== null && workOrder.workOrderId !== undefined && (
+                                  <span className="text-gray-500">WO #{workOrder.workOrderId}</span>
+                                )}
+                                {workOrder.costCenterId && (
+                                  <span className="text-gray-500">CC: {workOrder.costCenterId}</span>
+                                )}
+                                <span style={{ color: workOrder.statusColor || worker.statusColor || '#999' }}>
+                                  {workOrder.status || worker.status || 'Unknown'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-6 text-sm">
-                        <div className="text-right">
-                          <div className="text-gray-600">Work Time</div>
-                          <div className={`font-semibold ${
-                            worker.isActivelyWorking ? 'text-green-600' : 'text-gray-900'
+                          <div className="flex items-center gap-6 text-sm">
+                            <div className="text-right">
+                              <div className="text-gray-600">Work Time</div>
+                              <div className={`font-semibold ${
+                                worker.isActivelyWorking ? 'text-green-600' : 'text-gray-900'
+                              }`}>
+                                {formatDuration(workOrder.workMinutes || 0)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ));
+                    }
+                    // Fallback: if no work orders, show worker row (backward compatibility)
+                    return (
+                      <div 
+                        key={worker.workerId}
+                        className={`flex items-center justify-between p-3 rounded-lg transition ${
+                          worker.isActivelyWorking 
+                            ? 'bg-green-50 border-2 border-green-200' 
+                            : 'bg-gray-50 hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold relative ${
+                            worker.isActivelyWorking ? 'bg-green-500' : 'bg-blue-500'
                           }`}>
-                            {formatDuration(worker.totalMinutes)}
+                            {worker.workerName && worker.workerName.split(' ').map(n => n[0]).join('')}
+                            {worker.isActivelyWorking && (
+                              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></span>
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{worker.workerName || 'Unknown Worker'}</div>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <span style={{ color: worker.statusColor || '#999' }}>{worker.status || 'Unknown'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-6 text-sm">
+                          <div className="text-right">
+                            <div className="text-gray-600">Work Time</div>
+                            <div className={`font-semibold ${
+                              worker.isActivelyWorking ? 'text-green-600' : 'text-gray-900'
+                            }`}>
+                              {formatDuration(worker.totalWorkMinutes || 0)}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
