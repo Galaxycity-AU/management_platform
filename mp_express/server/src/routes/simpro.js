@@ -1,5 +1,6 @@
 import express from 'express';
 import * as simproController from '../controllers/simProController.js';
+import * as simproSetup from '../controllers/simproSetup.js';
 
 const router = express.Router();
 
@@ -8,6 +9,7 @@ router.get('/jobs/:id', simproController.getJobById);
 router.get('/schedules', simproController.getAllSchedules);
 router.get('/schedules/:id', simproController.getScheduleById);
 router.get('/logs/mobileStatus', simproController.getMobileStatusLog);
+router.get('/setup',simproSetup.setupFunction);
 // router.post('simpro/createScheduleWebhook', simproController.createScheduleWebhook);
 // router.get('simpro/projects', simproController.getAllProjects);
 // router.post('simpro/projects', simproController.createProject);

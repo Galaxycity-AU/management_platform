@@ -10,7 +10,8 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 const db = mysql.createPool({
-    database: process.env.DATABASE_NAME,
+    // database: process.env.DATABASE_NAME,
+    database: 'galaxyproject_prod',
     user: process.env.SQL_USER,
     password: process.env.SQL_PASSWORD,
     host: process.env.SQL_HOST,
@@ -19,5 +20,7 @@ const db = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0
 });
+
+
 
 export default db;
