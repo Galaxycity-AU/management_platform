@@ -1,4 +1,5 @@
 import { prepareLogTableData } from '../utils/dataPreparation.js';
+import { createData } from '../utils/simprohelper.js';
 
 // In-memory storage for server-side (could be replaced with database or file storage)
 let storedLogs = [];
@@ -715,6 +716,11 @@ async function syncLogs(rawLogs) {
     const currentLastProcessedId = await getLastProcessedIdFromStore();
     const newLogs = logsArray.filter(l => (l.ID || 0) > currentLastProcessedId);
   
+    // Store new logs to database
+    if (newLogs.length > 0) {
+        await storeLogToDb(newLogs);
+    }
+  
     const existingLogs = await getStoredLogs();
     const mergedLogs = mergeLogs(existingLogs, newLogs);
   
@@ -735,6 +741,30 @@ async function syncLogs(rawLogs) {
       lastProcessedId: highestId,
       tableRows
     };
+}
+
+async function storeLogToDb(logs){
+  try {
+    const logsArray = Array.isArray(logs) ? logs : (logs.data || logs.items || []);
+    for (const log of logsArray) {
+      console.log('log',log);
+      const logData = {
+        id: log.ID,
+        staff_id: log.Staff?.ID,
+        project_id:log.WorkOrder?.ProjectID,
+        work_order_id: log.WorkOrder?.ID || null,
+        cc_id: log.WorkOrder?.CostCenterID,
+        status_id: log.Status?.ID,
+        time:log.DateLogged,
+        created_at: new Date()
+      };
+      await createData('log', logData);
+      console.log(`✓ Stored log ${log.ID} to database`);
+    }
+    return true;
+  } catch (error) {
+    throw new Error(`Error storing logs to database: ${error.message}`);
+  }
 }
 
 export { syncLogs };
