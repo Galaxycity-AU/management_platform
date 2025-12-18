@@ -166,6 +166,19 @@ const API_Testing = () => {
     }
   }
 
+  const handleGetSetup = async () => {
+    setLoading(true);
+    setDisplay('Fetching /api/simpro/setup ...');
+    try {
+      const data = await callAPI("GET",'/setup');
+      setDisplay(`Success: ${JSON.stringify(data, null, 2)}`);
+    } catch (err) {
+      setDisplay(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl p-6 border border-gray-200">
       <h2 className="text-xl font-bold mb-4">API Testing</h2>
@@ -190,6 +203,7 @@ const API_Testing = () => {
         <button onClick={handleGetAllSchedule} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get All Schedules</button>
         <button onClick={handleGetDetailSchedule} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Schedule Detail</button>
         <button onClick={handleGetLog} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Logs</button>
+        <button onClick={handleGetSetup} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Setup</button>
       </div>
 
       {/* Event Tracking View */}

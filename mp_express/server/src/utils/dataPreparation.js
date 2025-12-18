@@ -2,7 +2,7 @@ import { formatDateTime } from './helpers.js';
 
 //data preparation
 
-async function filterToGet7DaysSchedule(data){
+function filterToGet7DaysSchedule(data){
     if (!Array.isArray(data)) {
         return data;
     }
@@ -11,7 +11,7 @@ async function filterToGet7DaysSchedule(data){
     today.setHours(0, 0, 0, 0);
     
     const next7Days = new Date(today);
-    next7Days.setDate(today.getDate() + 7);
+    next7Days.setDate(today.getDate() + 20);
     
     const filtered = data.filter(item => {
         if (!item.Date) return false;
@@ -25,7 +25,7 @@ async function filterToGet7DaysSchedule(data){
     return filtered;
 }
 
-async function prepareScheduleTableData(data){
+function prepareScheduleTableData(data){
     if (!Array.isArray(data)) {
         return [];
     }
@@ -33,7 +33,7 @@ async function prepareScheduleTableData(data){
     const tableRows = [];
     
     data.forEach(item => {
-        console.log(item);
+        // console.log(item);
         if (item.Blocks && item.Blocks.length > 0) {
             item.Blocks.forEach((block, blockIndex) => {
                 if (item.Reference) {
@@ -86,7 +86,7 @@ function prepareLogTableData(data){
     return tableRows;
 }
 
-async function groupScheduleByJobId(data){
+function groupScheduleByJobId(data){
     const jobMap = {};
   
     data.forEach(entry => {
