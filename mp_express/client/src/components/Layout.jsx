@@ -29,7 +29,6 @@ export const Layout = ({ children }) => {
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/projects', icon: ListTodo, label: 'Projects', count: stats?.totalProjects },
-    { path: '/simpro-projects', icon: ListTodo, label: 'SimPRO Projects' },
     { 
       path: '/approvals', 
       icon: ClipboardCheck, 

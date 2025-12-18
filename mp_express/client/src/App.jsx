@@ -3,52 +3,52 @@ import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-do
 import { Layout } from './components/Layout';
 import DashboardPage from './pages/Dashboard';
 import ProjectsPage from './pages/Projects';
-import SimPROProjectPage from './pages/SimPROProject';
+// import SimPROProjectPage from './pages/SimPROProject';
 import ApprovalsPage from './pages/Approvals';
 import API_TestingPage from './pages/API_Testing';
 import { ProjectDetail } from './components/ProjectDetail';
-import { SimPROProjectDetail } from './components/SimPROProjectDetail';
+// import { SimPROProjectDetail } from './components/SimPROProjectDetail';
 import { fetchProjects, fetchJobs, fetchWorkers } from './utils/apiUtils';
 import { LogStatus } from './types';
 function App() {
   const [projects, setProjects] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [simproProjects, setSimproProjects] = useState([]);
-  const [simproLogs, setSimproLogs] = useState([]);
+  // const [simproProjects, setSimproProjects] = useState([]);
+  // const [simproLogs, setSimproLogs] = useState([]);
   const [aiAnalysisResult, setAiAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Load SimPRO data
-  const loadSimPROData = async () => {
-    try {
-      const response = await fetch('/api/simpro/projects');
-      const data = await response.json();
+  // const loadSimPROData = async () => {
+  //   try {
+  //     const response = await fetch('/api/simpro/projects');
+  //     const data = await response.json();
 
-      const projectsWithDates = (data.projects || []).map((p) => ({
-        ...p,
-        scheduledStart: p.scheduledStart ? new Date(p.scheduledStart) : new Date(),
-        scheduledEnd: p.scheduledEnd ? new Date(p.scheduledEnd) : new Date(),
-        status: p.status,
-        schedules: p.schedules || [],
-      }));
+  //     const projectsWithDates = (data.projects || []).map((p) => ({
+  //       ...p,
+  //       scheduledStart: p.scheduledStart ? new Date(p.scheduledStart) : new Date(),
+  //       scheduledEnd: p.scheduledEnd ? new Date(p.scheduledEnd) : new Date(),
+  //       status: p.status,
+  //       schedules: p.schedules || [],
+  //     }));
 
-      const logsWithDates = (data.logs || []).map((l) => ({
-        ...l,
-        scheduledStart: new Date(l.scheduledStart),
-        scheduledEnd: new Date(l.scheduledEnd),
-        actualStart: l.actualStart ? new Date(l.actualStart) : null,
-        actualEnd: l.actualEnd ? new Date(l.actualEnd) : null,
-        status: l.status,
-      }));
+  //     const logsWithDates = (data.logs || []).map((l) => ({
+  //       ...l,
+  //       scheduledStart: new Date(l.scheduledStart),
+  //       scheduledEnd: new Date(l.scheduledEnd),
+  //       actualStart: l.actualStart ? new Date(l.actualStart) : null,
+  //       actualEnd: l.actualEnd ? new Date(l.actualEnd) : null,
+  //       status: l.status,
+  //     }));
 
-      setSimproProjects(projectsWithDates);
-      setSimproLogs(logsWithDates);
-    } catch (error) {
-      console.error('Error loading SimPRO data:', error);
-      setSimproProjects([]);
-      setSimproLogs([]);
-    }
-  };
+  //     setSimproProjects(projectsWithDates);
+  //     setSimproLogs(logsWithDates);
+  //   } catch (error) {
+  //     console.error('Error loading SimPRO data:', error);
+  //     setSimproProjects([]);
+  //     setSimproLogs([]);
+  //   }
+  // };
 
   // Load DB data
   const loadDBData = async () => {
@@ -131,7 +131,7 @@ function App() {
 
   useEffect(() => {
     loadDBData();
-    loadSimPROData();
+    // loadSimPROData();
   }, []);
 
   const handleAnalyzeProject = async (project) => {
@@ -166,8 +166,8 @@ function App() {
             />
           } 
         />
-        <Route path="/simpro-projects" element={<SimPROProjectPage />} />
-        <Route 
+        {/* <Route path="/simpro-projects" element={<SimPROProjectPage />} /> */}
+        {/* <Route 
           path="/simpro-projects/:id" 
           element={
             <SimPROProjectDetailWrapper 
@@ -176,7 +176,7 @@ function App() {
               onAnalyze={handleAnalyzeProject}
             />
           } 
-        />
+        /> */}
         <Route path="/approvals" element={<ApprovalsPage />} />
         <Route path="/api-testing" element={<API_TestingPage />} />
 
@@ -211,28 +211,28 @@ function ProjectDetailWrapper({ projects, logs, onAnalyze }) {
 }
 
 // Wrapper component for SimPROProjectDetail with route params
-function SimPROProjectDetailWrapper({ projects, logs, onAnalyze }) {
-  const { id } = useParams();
-  const navigate = useNavigate();
+// function SimPROProjectDetailWrapper({ projects, logs, onAnalyze }) {
+//   const { id } = useParams();
+//   const navigate = useNavigate();
 
-  const project = projects.find(p => String(p.id) === String(id));
+//   const project = projects.find(p => String(p.id) === String(id));
 
-  if (!project) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg text-gray-600">Project not found</div>
-      </div>
-    );
-  }
+//   if (!project) {
+//     return (
+//       <div className="flex items-center justify-center h-screen">
+//         <div className="text-lg text-gray-600">Project not found</div>
+//       </div>
+//     );
+//   }
 
-  return (
-    <SimPROProjectDetail
-      project={project}
-      logs={logs.filter(l => String(l.projectId) === String(id))}
-      onBack={() => navigate('/simpro-projects')}
-      onAnalyze={onAnalyze}
-    />
-  );
-}
+  // return (
+  //   <SimPROProjectDetail
+  //     project={project}
+  //     logs={logs.filter(l => String(l.projectId) === String(id))}
+  //     onBack={() => navigate('/simpro-projects')}
+  //     onAnalyze={onAnalyze}
+  //   />
+  // );
+// }
 
 export default App;

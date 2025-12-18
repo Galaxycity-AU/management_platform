@@ -278,7 +278,6 @@ const CentraliseView = () => {
   // Check if a worker has any late conditions (comprehensive check)
   const hasLateConditions = (resourceId) => {
     const jobs = getJobsForResourceOnSelectedDate(resourceId);
-    console.log('Checking late conditions for resource:', resourceId, 'Jobs found:', jobs.length);
     if (jobs.length === 0) return false;
 
     return jobs.some(job => getJobLateReason(job) !== null);
