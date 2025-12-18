@@ -520,7 +520,7 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 max-w-7xl mx-auto w-full space-y-4 md:space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 mx-auto w-full space-y-4 md:space-y-6">
 
                 {/* High Level Stats Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">

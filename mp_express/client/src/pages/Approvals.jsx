@@ -133,7 +133,7 @@ function ApprovalsPage() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto">
+        <div className="mx-auto w-[95vw] max-w-[90%]">
             <ApprovalQueue 
                 logs={logs} 
                 onApprove={handleApproveLog} 
