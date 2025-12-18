@@ -1,5 +1,5 @@
 import { prepareLogTableData } from '../utils/dataPreparation.js';
-import { createData } from '../utils/simprohelper.js';
+import { createData, findData } from '../utils/simprohelper.js';
 
 // In-memory storage for server-side (could be replaced with database or file storage)
 let storedLogs = [];
@@ -747,6 +747,14 @@ async function storeLogToDb(logs){
   try {
     const logsArray = Array.isArray(logs) ? logs : (logs.data || logs.items || []);
     for (const log of logsArray) {
+      // Check if log already exists in database
+      const existingLog = await findData('log', log.ID);
+      
+      if (existingLog) {
+        console.log(`⊘ Log ${log.ID} already exists in database, skipping...`);
+        continue;
+      }
+      
       console.log('log',log);
       const logData = {
         id: log.ID,

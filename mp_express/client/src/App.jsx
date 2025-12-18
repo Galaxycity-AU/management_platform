@@ -10,7 +10,6 @@ import { ProjectDetail } from './components/ProjectDetail';
 import { SimPROProjectDetail } from './components/SimPROProjectDetail';
 import { fetchProjects, fetchJobs, fetchWorkers } from './utils/apiUtils';
 import { LogStatus } from './types';
-import ApprovalDemo from './components/testApproval';
 function App() {
   const [projects, setProjects] = useState([]);
   const [logs, setLogs] = useState([]);
@@ -181,7 +180,6 @@ function App() {
         <Route path="/approvals" element={<ApprovalsPage />} />
         <Route path="/api-testing" element={<API_TestingPage />} />
 
-        <Route path="/test-approval" element={<ApprovalDemo />} />
       </Routes>
     </Layout>
   );
