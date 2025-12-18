@@ -74,11 +74,7 @@ const CentraliseView = () => {
         fetchProjects()
       ]);
 
-      console.log('Data fetched:', {
-        workers: workersData?.length || 0,
-        jobs: jobsData?.length || 0,
-        projects: projectsData?.length || 0
-      });
+      [projectsData, jobsData, workersData].map(d => console.log('Fetched DB Data:', d));
 
       // Create a map of projects for quick lookup
       const projectsMap = new Map(projectsData.map((p) => [p.id, p]));
@@ -89,8 +85,8 @@ const CentraliseView = () => {
         const workerJobs = jobsData.filter((job) => job.worker_id === worker.id);
         const totalHours = workerJobs.reduce((sum, job) => {
           // Use scheduled times, or actual times, or modified times
-          const startTime = job.actual_start || job.modified_start || job.scheduled_start;
-          const endTime = job.actual_end || job.modified_end || job.scheduled_end;
+          const startTime = job.actual_start || job.modified_start || job.schedules_start;
+          const endTime = job.actual_end || job.modified_end || job.schedules_end;
           if (startTime && endTime) {
             return sum + calculateDuration(startTime, endTime);
           }
@@ -113,9 +109,9 @@ const CentraliseView = () => {
       // Transform jobs to scheduledJobs format
       const transformedJobs = jobsData
         .filter((job) => {
-          // Use scheduled_start or modified_start or actual_start
-          const startTime = job.scheduled_start;
-          const endTime = job.scheduled_end;
+          // Use schedules_start or modified_start or actual_start
+          const startTime = job.schedules_start;
+          const endTime = job.schedules_end;
           return startTime && endTime; // Only include jobs with valid time data
         })
         .map((job) => {
@@ -123,8 +119,8 @@ const CentraliseView = () => {
           const projectName = project?.name || `Project ${job.project_id}`;
           
           // Use the most relevant times (actual > modified > scheduled)
-          const startDatetime = job.scheduled_start;
-          const endDatetime = job.scheduled_end;
+          const startDatetime = job.schedules_start;
+          const endDatetime = job.schedules_end;
           
           const startHour = parseTimeToHours(startDatetime);
           const duration = calculateDuration(startDatetime, endDatetime);
@@ -152,8 +148,8 @@ const CentraliseView = () => {
             date: jobDate,
             color: color,
             type: 'job',
-            scheduledStart: job.scheduled_start,
-            scheduledEnd: job.scheduled_end,
+            schedulesStart: job.schedules_start,
+            schedulesEnd: job.schedules_end,
             actualStart: job.actual_start || null,
             actualEnd: job.actual_end || null,
             status: job.status
@@ -230,7 +226,8 @@ const CentraliseView = () => {
 
   // Get late reason for a specific job
   const getJobLateReason = (job) => {
-    if (!job || !job.scheduledStart) return null;
+    // console.log('late check for job:', job.id, job.schedulesStart,job.schedulesEnd, job.actualStart, job.actualEnd, job.status);
+    if (!job || !job.schedulesStart) return null;
 
     // Don't show late condition if job is approved or rejected
     if (job.status === 'approved' || job.status === 'rejected') return null;
@@ -238,8 +235,8 @@ const CentraliseView = () => {
     const now = new Date();
     const threshold = 10 * 60 * 1000; // 10 minutes in milliseconds
 
-    const scheduledStart = new Date(job.scheduledStart);
-    const scheduledEnd = job.scheduledEnd ? new Date(job.scheduledEnd) : null;
+    const scheduledStart = new Date(job.schedulesStart);
+    const scheduledEnd = job.schedulesEnd ? new Date(job.schedulesEnd) : null;
 
     // Check if the scheduled start date is today or in the past
     const schedStartDate = new Date(scheduledStart);
@@ -251,8 +248,7 @@ const CentraliseView = () => {
     // 1. Shift not started yet but past scheduled start time (overdue to start)
     const overdueScheduled = isScheduledTodayOrPast && 
                              !job.actualStart && 
-                             (now.getTime() - scheduledStart.getTime() > threshold) &&
-                             (job.status === 'schedule' || !job.status);
+                             (now.getTime() - scheduledStart.getTime() > threshold);
 
     // 2. Shift started late (actual start is after scheduled start + threshold)
     const actualStartLate = job.actualStart != null && 
@@ -269,6 +265,7 @@ const CentraliseView = () => {
                          scheduledEnd != null &&
                          (new Date(job.actualEnd).getTime() - scheduledEnd.getTime() > threshold);
 
+    
     // Return the reason for the late condition
     if (overdueScheduled) return 'Overdue Scheduled';
     if (actualStartLate) return 'Actual Start Late';
@@ -281,6 +278,7 @@ const CentraliseView = () => {
   // Check if a worker has any late conditions (comprehensive check)
   const hasLateConditions = (resourceId) => {
     const jobs = getJobsForResourceOnSelectedDate(resourceId);
+    console.log('Checking late conditions for resource:', resourceId, 'Jobs found:', jobs.length);
     if (jobs.length === 0) return false;
 
     return jobs.some(job => getJobLateReason(job) !== null);
@@ -327,12 +325,12 @@ const CentraliseView = () => {
     }
 
     const lateJob = jobsToday.find(job => {
-      const scheduledStart = parseTimeToHours(job.scheduledStart);
+      const scheduledStart = parseTimeToHours(job.schedulesStart);
       return currentHour > scheduledStart + 0.25 && !job.actualStart;
     });
     
     if (lateJob) {
-      const scheduledTime = new Date(lateJob.scheduledStart);
+      const scheduledTime = new Date(lateJob.schedulesStart);
       const scheduledTimeStr = scheduledTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       return { 
         status: 'late', 
@@ -343,12 +341,12 @@ const CentraliseView = () => {
     }
 
     const upcomingJob = jobsToday.find(job => {
-      const scheduledStart = parseTimeToHours(job.scheduledStart);
+      const scheduledStart = parseTimeToHours(job.schedulesStart);
       return currentHour < scheduledStart;
     });
 
     if (upcomingJob) {
-      const scheduledTime = new Date(upcomingJob.scheduledStart);
+      const scheduledTime = new Date(upcomingJob.schedulesStart);
       const scheduledTimeStr = scheduledTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       return { 
         status: 'scheduled', 
@@ -1009,11 +1007,11 @@ const CentraliseView = () => {
                         </svg>
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            {formatDateTime(selectedJob.scheduledStart)}
+                            {formatDateTime(selectedJob.schedulesStart)}
                           </p>
-                          {selectedJob.scheduledEnd && (
+                          {selectedJob.schedulesEnd && (
                             <p className="text-sm text-gray-600">
-                              to {formatDateTime(selectedJob.scheduledEnd)}
+                              to {formatDateTime(selectedJob.schedulesEnd)}
                             </p>
                           )}
                         </div>

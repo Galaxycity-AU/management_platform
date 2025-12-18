@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Clock, TriangleAlert } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, AlertTriangle } from 'lucide-react';
 import { fetchWorkers, fetchJobs, fetchProjects } from '../utils/apiUtils';
 
 const CentraliseView = () => {
@@ -87,8 +87,8 @@ const CentraliseView = () => {
         const workerJobs = jobsData.filter((job) => job.worker_id === worker.id);
         const totalHours = workerJobs.reduce((sum, job) => {
           // Use scheduled times, or actual times, or modified times
-          const startTime = job.actual_start || job.modified_start || job.scheduled_start;
-          const endTime = job.actual_end || job.modified_end || job.scheduled_end;
+          const startTime = job.actual_start || job.modified_start || job.schedules_start;
+          const endTime = job.actual_end || job.modified_end || job.schedules_end;
           if (startTime && endTime) {
             return sum + calculateDuration(startTime, endTime);
           }
@@ -111,9 +111,9 @@ const CentraliseView = () => {
       // Transform jobs to scheduledJobs format
       const transformedJobs = jobsData
         .filter((job) => {
-          // Use scheduled_start or modified_start or actual_start
-          const startTime = job.scheduled_start;
-          const endTime = job.scheduled_end;
+          // Use schedules_start or modified_start or actual_start
+          const startTime = job.schedules_start;
+          const endTime = job.schedules_end;
           return startTime && endTime; // Only include jobs with valid time data
         })
         .map((job) => {
@@ -121,8 +121,8 @@ const CentraliseView = () => {
           const projectName = project?.name || `Project ${job.project_id}`;
           
           // Use the most relevant times (actual > modified > scheduled)
-          const startDatetime = job.scheduled_start;
-          const endDatetime = job.scheduled_end;
+          const startDatetime = job.schedules_start;
+          const endDatetime = job.schedules_end;
           
           const startHour = parseTimeToHours(startDatetime);
           const duration = calculateDuration(startDatetime, endDatetime);
@@ -150,8 +150,8 @@ const CentraliseView = () => {
             date: jobDate,
             color: color,
             type: 'job',
-            scheduledStart: job.scheduled_start,
-            scheduledEnd: job.scheduled_end,
+            scheduledStart: job.schedules_start,
+            scheduledEnd: job.schedules_end,
             actualStart: job.actual_start || null,
             actualEnd: job.actual_end || null,
             status: job.status
@@ -228,7 +228,7 @@ const CentraliseView = () => {
 
   // Get late reason for a specific job
   const getJobLateReason = (job) => {
-    if (!job || !job.scheduledStart) return null;
+    if (!job || !job.schedulesStart) return null;
 
     // Don't show late condition if job is approved or rejected
     if (job.status === 'approved' || job.status === 'rejected') return null;
@@ -236,8 +236,8 @@ const CentraliseView = () => {
     const now = new Date();
     const threshold = 10 * 60 * 1000; // 10 minutes in milliseconds
 
-    const scheduledStart = new Date(job.scheduledStart);
-    const scheduledEnd = job.scheduledEnd ? new Date(job.scheduledEnd) : null;
+    const scheduledStart = new Date(job.schedulesStart);
+    const scheduledEnd = job.schedulesEnd ? new Date(job.schedulesEnd) : null;
 
     // Check if the scheduled start date is today or in the past
     const schedStartDate = new Date(scheduledStart);
@@ -325,12 +325,12 @@ const CentraliseView = () => {
     }
 
     const lateJob = jobsToday.find(job => {
-      const scheduledStart = parseTimeToHours(job.scheduledStart);
+      const scheduledStart = parseTimeToHours(job.schedulesStart);
       return currentHour > scheduledStart + 0.25 && !job.actualStart;
     });
     
     if (lateJob) {
-      const scheduledTime = new Date(lateJob.scheduledStart);
+      const scheduledTime = new Date(lateJob.schedulesStart);
       const scheduledTimeStr = scheduledTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       return { 
         status: 'late', 
@@ -341,12 +341,12 @@ const CentraliseView = () => {
     }
 
     const upcomingJob = jobsToday.find(job => {
-      const scheduledStart = parseTimeToHours(job.scheduledStart);
+      const scheduledStart = parseTimeToHours(job.schedulesStart);
       return currentHour < scheduledStart;
     });
 
     if (upcomingJob) {
-      const scheduledTime = new Date(upcomingJob.scheduledStart);
+      const scheduledTime = new Date(upcomingJob.schedulesStart);
       const scheduledTimeStr = scheduledTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       return { 
         status: 'scheduled', 
@@ -717,7 +717,7 @@ const CentraliseView = () => {
                     <span className="truncate">{resource.name}</span>
 
                     {hasLateConditions(resource.id) && (
-                      <TriangleAlert
+                      <AlertTriangle
                         className="w-5 h-5 text-red-500 ml-auto animate-pulse"
                         aria-hidden="true"
                         style={{ animationDuration: "1.5s" }}
@@ -931,7 +931,7 @@ const CentraliseView = () => {
                   </div>
                   {lateReason && (
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-300">
-                      <TriangleAlert className="w-4 h-4" />
+                      <AlertTriangle className="w-4 h-4" />
                       <span>{lateReason}</span>
                     </div>
                   )}
@@ -1007,11 +1007,11 @@ const CentraliseView = () => {
                         </svg>
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            {formatDateTime(selectedJob.scheduledStart)}
+                            {formatDateTime(selectedJob.schedulesStart)}
                           </p>
-                          {selectedJob.scheduledEnd && (
+                          {selectedJob.schedulesEnd && (
                             <p className="text-sm text-gray-600">
-                              to {formatDateTime(selectedJob.scheduledEnd)}
+                              to {formatDateTime(selectedJob.schedulesEnd)}
                             </p>
                           )}
                         </div>

@@ -480,7 +480,7 @@ export const SimPROProjectDetail: React.FC<SimPROProjectDetailProps> = ({ projec
                                                                 <div>
                                                                     <span className="text-gray-500">Scheduled:</span>
                                                                     <p className="text-gray-900 font-medium mt-0.5">
-                                                                        {formatTime(log.scheduledStart)} - {formatTime(log.scheduledEnd)}
+                                                                        {formatTime(log.schedulesStart)} - {formatTime(log.schedulesEnd)}
                                                                     </p>
                                                                 </div>
                                                                 <div>

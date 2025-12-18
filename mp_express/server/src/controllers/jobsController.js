@@ -30,12 +30,12 @@ export const getJobsByProject = async (req, res) => {
 
 export const createJob = async (req, res) => {
   try {
-    const { project_id, worker_id, status, scheduled_start, scheduled_end, actual_start, actual_end, approval_id } = req.body;
+    const { project_id, worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id } = req.body;
     const [result] = await db.query(
-      `INSERT INTO jobs (project_id, worker_id, status, scheduled_start, scheduled_end, 
+      `INSERT INTO jobs (project_id, worker_id, status, schedules_start, schedules_end, 
        actual_start, actual_end, approval_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [project_id, worker_id, status, scheduled_start, scheduled_end, actual_start, actual_end, approval_id]
+      [project_id, worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id]
     );
     
     if (status === 'waiting_approval') {
@@ -59,7 +59,7 @@ export const createJob = async (req, res) => {
 
 export const updateJob = async (req, res) => {
   try {
-    const { worker_id, status, scheduled_start, scheduled_end, actual_start, actual_end, approval_id } = req.body;
+    const { worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id } = req.body;
     const jobId = req.params.id;
     
     const [currentJob] = await db.query('SELECT status, approval_id FROM jobs WHERE id = ?', [jobId]);
@@ -67,10 +67,10 @@ export const updateJob = async (req, res) => {
     const currentApprovalId = currentJob[0]?.approval_id;
     
     await db.query(
-      `UPDATE jobs SET worker_id=?, status=?, scheduled_start=?, scheduled_end=?, 
+      `UPDATE jobs SET worker_id=?, status=?, schedules_start=?, schedules_end=?, 
        actual_start=?, actual_end=?, approval_id=? 
        WHERE id=?`,
-      [worker_id, status, scheduled_start, scheduled_end, actual_start, actual_end, approval_id, jobId]
+      [worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id, jobId]
     );
     
     if (status === 'waiting_approval' && currentStatus !== 'waiting_approval' && !currentApprovalId) {

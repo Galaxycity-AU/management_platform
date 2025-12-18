@@ -167,8 +167,8 @@ const mockLogs = [
 ];
 
 const TimelineComparison = ({ log, isHistory }) => {
-  const schedStart = log.scheduledStart;
-  const schedEnd = log.scheduledEnd;
+  const schedStart = log.schedulesStart;
+  const schedEnd = log.schedulesEnd;
   
   const actStart = log.actualStart || schedStart;
   const actEnd = log.actualEnd || schedEnd;
@@ -259,8 +259,8 @@ const TimelineComparison = ({ log, isHistory }) => {
 const LogDetailCard = ({ log, onApprove, onReject, isHistory }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const startDiff = log.actualStart ? (log.actualStart.getTime() - log.scheduledStart.getTime()) / 60000 : 0;
-  const endDiff = log.actualEnd ? (log.actualEnd.getTime() - log.scheduledEnd.getTime()) / 60000 : 0;
+  const startDiff = log.actualStart ? (log.actualStart.getTime() - log.schedulesStart.getTime()) / 60000 : 0;
+  const endDiff = log.actualEnd ? (log.actualEnd.getTime() - log.schedulesEnd.getTime()) / 60000 : 0;
   const hasIssues = Math.abs(startDiff) > 10 || Math.abs(endDiff) > 15;
 
   const duration = log.actualEnd && log.actualStart 
@@ -387,8 +387,8 @@ const LogDetailCard = ({ log, onApprove, onReject, isHistory }) => {
             )}
 
             <div className="mb-2 text-xs text-gray-500">
-              Scheduled: {log.scheduledStart?.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - 
-              {log.scheduledEnd?.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+              Scheduled: {log.schedulesStart?.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - 
+              {log.schedulesEnd?.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
             </div>
 
             <div className="mb-2 p-2 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
@@ -462,8 +462,8 @@ function ApprovalDemo() {
       const project = projectMap.get(log.projectId);
       project.count++;
       
-      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.scheduledStart.getTime()) / 60000;
-      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.scheduledEnd.getTime()) / 60000;
+      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.schedulesStart.getTime()) / 60000;
+      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.schedulesEnd.getTime()) / 60000;
       if (startDiff > 10 || endDiff > 15) {
         project.hasIssues = true;
       }

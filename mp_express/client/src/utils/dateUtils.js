@@ -87,7 +87,7 @@ export const checkTimeFilter = (project, filter) => {
 export const filterTodaysLogs = (logs) => {
   const today = getToday();
   return logs.filter(log => {
-    const logDate = new Date(log.scheduledStart);
+    const logDate = new Date(log.schedulesStart);
     logDate.setHours(0, 0, 0, 0);
     return logDate.getTime() === today.getTime();
   });

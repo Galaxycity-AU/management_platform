@@ -40,17 +40,17 @@ export const suggestApprovalAction = async (log) => {
     if (!ai) return "Unable to suggest.";
 
     // Calculate variance
-    const startDiff = log.actualStart && log.scheduledStart 
-        ? (log.actualStart.getTime() - log.scheduledStart.getTime()) / 60000 
+    const startDiff = log.actualStart && log.schedulesStart 
+        ? (log.actualStart.getTime() - log.schedulesStart.getTime()) / 60000 
         : 0;
-    const endDiff = log.actualEnd && log.scheduledEnd
-        ? (log.actualEnd.getTime() - log.scheduledEnd.getTime()) / 60000
+    const endDiff = log.actualEnd && log.schedulesEnd
+        ? (log.actualEnd.getTime() - log.schedulesEnd.getTime()) / 60000
         : 0;
     
     const prompt = `
     A worker submitted the following time log. Suggest if the manager should Approve or Investigate.
     
-    Scheduled: ${log.scheduledStart.toLocaleTimeString()} - ${log.scheduledEnd.toLocaleTimeString()}
+    Scheduled: ${log.schedulesStart.toLocaleTimeString()} - ${log.schedulesEnd.toLocaleTimeString()}
     Actual: ${log.actualStart?.toLocaleTimeString()} - ${log.actualEnd?.toLocaleTimeString()}
     Variance Start: ${startDiff} minutes (positive is late)
     Variance End: ${endDiff} minutes (positive is overtime)

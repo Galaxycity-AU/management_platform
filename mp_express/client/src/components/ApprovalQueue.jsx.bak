@@ -9,8 +9,8 @@ import { LogStatus } from '../types';
 // --- Helper Components ---
 
 const TimelineComparison = ({ log }) => {
-  const schedStart = log.scheduledStart;
-  const schedEnd = log.scheduledEnd;
+  const schedStart = log.schedulesStart;
+  const schedEnd = log.schedulesEnd;
 
   // For history, show the FINAL adjusted time as the main "Actual" bar
   const actStart = log.actualStart || schedStart;
@@ -137,8 +137,8 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
   const [initialTimes, setInitialTimes] = useState({ start: null, end: null });
   const timelineRef = React.useRef(null);
 
-  const schedStart = log.scheduledStart;
-  const schedEnd = log.scheduledEnd;
+  const schedStart = log.schedulesStart;
+  const schedEnd = log.schedulesEnd;
 
   // Parse current edit times
   const parseEditTime = (timeStr, baseDate) => {
@@ -372,8 +372,8 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
     onApprove(log.id, newStart, newEnd, editReason || 'Manual adjustment');
   };
 
-  const startDiff = log.actualStart ? (log.actualStart.getTime() - log.scheduledStart.getTime()) / 60000 : 0;
-  const endDiff = log.actualEnd ? (log.actualEnd.getTime() - log.scheduledEnd.getTime()) / 60000 : 0;
+  const startDiff = log.actualStart ? (log.actualStart.getTime() - log.schedulesStart.getTime()) / 60000 : 0;
+  const endDiff = log.actualEnd ? (log.actualEnd.getTime() - log.schedulesEnd.getTime()) / 60000 : 0;
   const hasIssues = startDiff > 10 || endDiff < -10 || endDiff > 15;
 
   const quickReasons = [
@@ -563,7 +563,7 @@ const HistoryLogCard = ({ log }) => {
   const isAdjusted = log.editEndTime && log.actualEnd && log.editEndTime.getTime() !== log.actualEnd.getTime();
 
   // Format date
-  const jobDate = log.actualStart || log.scheduledStart;
+  const jobDate = log.actualStart || log.schedulesStart;
   const formattedDate = jobDate ? jobDate.toLocaleDateString('en-US', {
     weekday: 'short',
     year: 'numeric',
@@ -674,8 +674,8 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
       const project = projectMap.get(log.projectId);
       project.count++;
 
-      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.scheduledStart.getTime()) / 60000;
-      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.scheduledEnd.getTime()) / 60000;
+      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.schedulesStart.getTime()) / 60000;
+      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.schedulesEnd.getTime()) / 60000;
       if (startDiff > 10 || endDiff > 15) {
         project.hasIssues = true;
       }

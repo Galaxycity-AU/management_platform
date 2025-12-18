@@ -13,8 +13,8 @@ interface ApprovalQueueProps {
 // --- Helper Components ---
 
 const TimelineComparison: React.FC<{ log: WorkerLog; isHistory?: boolean }> = ({ log, isHistory }) => {
-  const schedStart = log.scheduledStart;
-  const schedEnd = log.scheduledEnd;
+  const schedStart = log.schedulesStart;
+  const schedEnd = log.schedulesEnd;
   
   // For history, show the FINAL adjusted time as the main "Actual" bar
   const actStart = log.actualStart || schedStart;
@@ -125,8 +125,8 @@ const LogApprovalCard: React.FC<{
         onApprove(log.id, newStart, newEnd, editReason || 'Manual adjustment');
     };
 
-    const startDiff = log.actualStart ? (log.actualStart.getTime() - log.scheduledStart.getTime()) / 60000 : 0;
-    const endDiff = log.actualEnd ? (log.actualEnd.getTime() - log.scheduledEnd.getTime()) / 60000 : 0;
+    const startDiff = log.actualStart ? (log.actualStart.getTime() - log.schedulesStart.getTime()) / 60000 : 0;
+    const endDiff = log.actualEnd ? (log.actualEnd.getTime() - log.schedulesEnd.getTime()) / 60000 : 0;
     const hasIssues = startDiff > 10 || endDiff < -10 || endDiff > 15;
 
     return (

@@ -47,16 +47,16 @@ function ProjectsPage() {
 
                 const logsData = jobsData
                     .filter((job) => {
-                        const startTime = job.actual_start || job.modified_start || job.scheduled_start;
-                        const endTime = job.actual_end || job.modified_end || job.scheduled_end;
+                        const startTime = job.actual_start || job.modified_start || job.schedules_start;
+                        const endTime = job.actual_end || job.modified_end || job.schedules_end;
                         return startTime && endTime;
                     })
                     .map((job) => {
                         const worker = workersMap.get(job.worker_id);
                         const project = projectsMap.get(job.project_id);
 
-                        const scheduledStart = new Date(job.scheduled_start);
-                        const scheduledEnd = new Date(job.scheduled_end);
+                        const scheduledStart = new Date(job.schedules_start);
+                        const scheduledEnd = new Date(job.schedules_end);
                         const actualStart = job.actual_start ? new Date(job.actual_start) : null;
                         const actualEnd = job.actual_end ? new Date(job.actual_end) : null;
 

@@ -28,8 +28,8 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
 
   // Expand range based on actual log data
   logs.forEach(log => {
-    if (log.scheduledStart < minTime) minTime = new Date(log.scheduledStart);
-    if (log.scheduledEnd > maxTime) maxTime = new Date(log.scheduledEnd);
+    if (log.schedulesStart < minTime) minTime = new Date(log.schedulesStart);
+    if (log.schedulesEnd > maxTime) maxTime = new Date(log.schedulesEnd);
     if (log.actualStart && log.actualStart < minTime) minTime = new Date(log.actualStart);
     const endRef = log.actualEnd || new Date();
     if (endRef > maxTime) maxTime = endRef;
@@ -91,10 +91,10 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[] }> = ({ logs }) => {
       {/* Workers Rows */}
       <div className="space-y-1">
         {logs.map((log, idx) => {
-          const schedLeft = getPos(log.scheduledStart);
-          const schedWidth = getPos(log.scheduledEnd) - schedLeft;
+          const schedLeft = getPos(log.schedulesStart);
+          const schedWidth = getPos(log.schedulesEnd) - schedLeft;
           
-          const actualStart = log.actualStart || log.scheduledStart;
+          const actualStart = log.actualStart || log.schedulesStart;
           const actualEnd = log.actualEnd || now;
           const isLive = !log.actualEnd;
           

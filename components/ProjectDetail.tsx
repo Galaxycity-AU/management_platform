@@ -129,13 +129,13 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
             <div className="space-y-0 relative">
                 {logs.map((log, idx) => {
                     // Check if this is a carry-forward task from a previous day
-                    const isCarryForward = log.scheduledStart < minTime;
+                    const isCarryForward = log.schedulesStart < minTime;
 
                     // For carry-forward tasks, show scheduled bar from start of day
-                    const schedLeft = isCarryForward ? null : getPos(log.scheduledStart);
-                    const schedWidth = isCarryForward ? null : getPos(log.scheduledEnd) - schedLeft;
+                    const schedLeft = isCarryForward ? null : getPos(log.schedulesStart);
+                    const schedWidth = isCarryForward ? null : getPos(log.schedulesEnd) - schedLeft;
 
-                    const actualStart = log.actualStart || log.scheduledStart;
+                    const actualStart = log.actualStart || log.schedulesStart;
                     // A shift is "live" if it's ACTIVE status and has no actual end time (regardless of start date)
                     const isLive = !log.actualEnd && log.status === LogStatus.ACTIVE;
                     // For active status, extend to current time if viewing today; otherwise use scheduled end
@@ -196,7 +196,7 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
                     const threshold = 10 * 60 * 1000; // 10 minutes
 
                     // Check if the scheduled start date is today or in the past
-                    const schedStartDate = new Date(log.scheduledStart);
+                    const schedStartDate = new Date(log.schedulesStart);
                     schedStartDate.setHours(0, 0, 0, 0);
                     const todayDate = new Date(now);
                     todayDate.setHours(0, 0, 0, 0);
@@ -204,21 +204,21 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
 
                     // 1. Shift not started yet but past scheduled start time (overdue to start)
                     const overdueScheduled = isScheduledTodayOrPast && !log.actualStart &&
-                        (now.getTime() - log.scheduledStart.getTime() > threshold) &&
+                        (now.getTime() - log.schedulesStart.getTime() > threshold) &&
                         log.status === LogStatus.SCHEDULE;
 
                     // 2. Shift started late (actual start is after scheduled start + threshold)
                     const actualStartLate = log.actualStart != null &&
-                        (log.actualStart.getTime() - log.scheduledStart.getTime() > threshold);
+                        (log.actualStart.getTime() - log.schedulesStart.getTime() > threshold);
 
                     // 3. Shift is ACTIVE but exceeded scheduled end time (overtime - this is the key fix)
                     const overdueEndActive = log.status === LogStatus.ACTIVE &&
                         !log.actualEnd &&
-                        (now.getTime() - log.scheduledEnd.getTime() > threshold);
+                        (now.getTime() - log.schedulesEnd.getTime() > threshold);
 
                     // 4. Shift ended late (actual end is after scheduled end + threshold)
                     const actualEndLate = log.actualEnd != null &&
-                        (log.actualEnd.getTime() - log.scheduledEnd.getTime() > threshold);
+                        (log.actualEnd.getTime() - log.schedulesEnd.getTime() > threshold);
 
                     // Show alert for any of these conditions
                     const showAlert = (log.status === LogStatus.ACTIVE || log.status === LogStatus.SCHEDULE || log.status === LogStatus.WAITING_APPROVAL) && (overdueScheduled || actualStartLate || overdueEndActive || actualEndLate);
@@ -231,7 +231,7 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
                         actualEndLate,
                         showAlert,
                         isLive,
-                        scheduledEnd: log.scheduledEnd,
+                        scheduledEnd: log.schedulesEnd,
                         now: now
                     });
                     return (
@@ -290,7 +290,7 @@ const WorkerGanttChart: React.FC<{ logs: WorkerLog[]; currentDate: Date }> = ({ 
                                             style={{ left: `${schedLeft}%`, width: `${schedWidth}%` }}
                                         >
                                             <span className="text-xs text-gray-700">
-                                                {calculateDuration(log.scheduledStart, log.scheduledEnd)}
+                                                {calculateDuration(log.schedulesStart, log.schedulesEnd)}
                                             </span>
                                         </div>
                                     )}
@@ -747,7 +747,7 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, logs, onB
                                                                     <div>
                                                                         <span className="text-gray-500">Scheduled:</span>
                                                                         <p className="text-gray-900 font-medium mt-0.5">
-                                                                            {formatTime(log.scheduledStart)} - {formatTime(log.scheduledEnd)}
+                                                                            {formatTime(log.schedulesStart)} - {formatTime(log.schedulesEnd)}
                                                                         </p>
                                                                     </div>
                                                                     <div>

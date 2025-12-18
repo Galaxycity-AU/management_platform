@@ -4,7 +4,10 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { ProjectStatus, LogStatus } from '../types';
 
 // --- Worker Gantt Component (Reused logic) ---
-const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const formatTime = (date) => {
+    if (!date) return 'N/A';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 const WorkerGanttChart = ({ logs, currentDate }) => {
     const [hoveredLog, setHoveredLog] = React.useState(null);
@@ -136,7 +139,8 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
 
                     const actualStart = log.actualStart || log.scheduledStart;
                     // A shift is "live" if it's ACTIVE status and has no actual end time (regardless of start date)
-                    const isLive = !log.actualEnd && log.status === LogStatus.ACTIVE;
+                    // Also consider it live if it has an actual start time but no end time, even if status isn't explicitly ACTIVE yet
+                    const isLive = (!log.actualEnd && log.status === LogStatus.ACTIVE) || (!log.actualEnd && log.actualStart);
                     // For active status, extend to current time if viewing today; otherwise use scheduled end
                     const actualEnd = log.actualEnd || now;
 
@@ -332,10 +336,10 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                     }}
                 >
                     <div
-                        className="relative h-full"
+                        className="relative h-full px-4"
                         style={{
                             transform: `translateX(-${scrollLeft}px)`,
-                            width: '1200px'
+                            minWidth: '1200px'
                         }}
                     >
                         <div
@@ -343,7 +347,7 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                             style={{ left: `${currentPos}%` }}
                         >
                             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded font-semibold whitespace-nowrap">
-                                Now
+                                {formatTime(now)}
                             </div>
                         </div>
                     </div>
@@ -361,6 +365,8 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
     const [dailyNotes, setDailyNotes] = useState({});
     const [noteSaved, setNoteSaved] = useState(false);
     const [noteLastUpdated, setNoteLastUpdated] = useState({});
+
+    console.log('ProjectDetail Props:', { project, logs });
 
     // Helper function to create consistent date key for storage
     const getDateKey = (date) => {

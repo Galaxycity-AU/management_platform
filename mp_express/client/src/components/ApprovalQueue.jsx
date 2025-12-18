@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Check, X, Briefcase, History, Edit2, Save, ArrowRight, Clock,
-  AlertCircle, Filter, RotateCcw, Calendar, ChevronRight, Zap,
+  TriangleAlert, Filter, RotateCcw, Calendar, ChevronRight, Zap,
   CheckCircle2, SlidersHorizontal, User, Search
 } from 'lucide-react';
 import { LogStatus } from '../types';
@@ -9,8 +9,8 @@ import { LogStatus } from '../types';
 // --- Helper Components ---
 
 const TimelineComparison = ({ log }) => {
-  const schedStart = log.scheduledStart;
-  const schedEnd = log.scheduledEnd;
+  const schedStart = log.schedulesStart;
+  const schedEnd = log.schedulesEnd;
 
   // For history, show the FINAL adjusted time as the main "Actual" bar
   const actStart = log.actualStart || schedStart;
@@ -123,8 +123,8 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
   const [initialTimes, setInitialTimes] = useState({ start: null, end: null });
   const timelineRef = React.useRef(null);
 
-  const schedStart = log.scheduledStart;
-  const schedEnd = log.scheduledEnd;
+  const schedStart = log.schedulesStart;
+  const schedEnd = log.schedulesEnd;
 
   // Parse current edit times
   const parseEditTime = (timeStr, baseDate) => {
@@ -340,10 +340,17 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
   const [reason, setReason] = useState("");
 
   // Variance Calc
-  const sDur = log.scheduledEnd.getTime() - log.scheduledStart.getTime();
+  const sDur = log.schedulesEnd.getTime() - log.schedulesStart.getTime();
   const aDur = (log.actualEnd?.getTime() || 0) - (log.actualStart?.getTime() || 0);
   const diffMins = Math.round((aDur - sDur) / 60000);
-  const hasVariance = Math.abs(diffMins) > 15; // 15 min buffer
+  const hasDurationVariance = Math.abs(diffMins) > 15; // 15 min buffer
+
+  // Timing Check
+  const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.schedulesStart.getTime()) / 60000;
+  const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.schedulesEnd.getTime()) / 60000;
+  const hasTimingIssue = startDiff > 10 || endDiff > 15;
+  
+  const hasIssues = hasDurationVariance || hasTimingIssue;
 
   const formatTime = (d) => d ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
 
@@ -368,7 +375,7 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
         <div className="flex items-center p-4 gap-4">
           {/* 1. Worker Identity */}
           <div className="w-48 flex items-center gap-3 flex-shrink-0">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${hasVariance ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${hasIssues ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
               {log.workerName.charAt(0)}
             </div>
             <div className="min-w-0">
@@ -385,15 +392,24 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
           {/* 3. Variance Stats */}
           <div className="w-40 flex-shrink-0 text-center">
             <div className="text-sm font-mono font-medium text-gray-700">
-              {formatTime(log.scheduledStart)} - {formatTime(log.scheduledEnd)}
+              {formatTime(log.schedulesStart)} - {formatTime(log.schedulesEnd)}
             </div>
             <div className="text-sm font-mono font-medium text-gray-700">
               {log.actualStart?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.actualEnd?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>
-            {hasVariance ? (
-              <span className={`block text-xs font-bold ${diffMins > 0 ? 'text-amber-600' : 'text-blue-600'}`}>
-                {diffMins > 0 ? `+${diffMins}m Over` : `${diffMins}m Under`}
-              </span>
+            {hasIssues ? (
+               <div className="flex flex-col items-center">
+                 {hasDurationVariance && (
+                    <span className={`block text-xs font-bold ${diffMins > 0 ? 'text-amber-600' : 'text-blue-600'}`}>
+                        {diffMins > 0 ? `+${diffMins}m Over` : `${diffMins}m Under`}
+                    </span>
+                 )}
+                 {!hasDurationVariance && hasTimingIssue && (
+                    <span className="block text-xs font-bold text-amber-600 flex items-center gap-1">
+                        <TriangleAlert className="w-3 h-3" /> Schedule Var
+                    </span>
+                 )}
+               </div>
             ) : (
               <span className="text-xs text-green-600 font-medium flex items-center justify-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> On Time
@@ -480,8 +496,8 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <button
                   onClick={() => {
-                    setStartTime(log.scheduledStart.toTimeString().slice(0, 5));
-                    setEndTime(log.scheduledEnd.toTimeString().slice(0, 5));
+                    setStartTime(log.schedulesStart.toTimeString().slice(0, 5));
+                    setEndTime(log.schedulesEnd.toTimeString().slice(0, 5));
                     setReason("Reverted to Schedule");
                   }}
                   className="text-left px-3 py-2 bg-white border border-gray-200 rounded text-xs text-gray-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center gap-2"
@@ -537,7 +553,7 @@ const HistoryLogCard = ({ log }) => {
   const isAdjusted = log.editEndTime && log.actualEnd && log.editEndTime.getTime() !== log.actualEnd.getTime();
 
   // Format date
-  const jobDate = log.actualStart || log.scheduledStart;
+  const jobDate = log.actualStart || log.schedulesStart;
   const formattedDate = jobDate ? jobDate.toLocaleDateString('en-US', {
     weekday: 'short',
     year: 'numeric',
@@ -563,7 +579,7 @@ const HistoryLogCard = ({ log }) => {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1 font-medium">
                 <span className="text-gray-500 text-xs">
-                    Sched: {log.scheduledStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.scheduledEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Sched: {log.schedulesStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.schedulesEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               {(isAdjusted || log.editReason) ? (
@@ -655,8 +671,8 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
       const project = projectMap.get(log.projectId);
       project.count++;
 
-      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.scheduledStart.getTime()) / 60000;
-      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.scheduledEnd.getTime()) / 60000;
+      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.schedulesStart.getTime()) / 60000;
+      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.schedulesEnd.getTime()) / 60000;
       if (startDiff > 10 || endDiff > 15) {
         project.hasIssues = true;
       }
@@ -752,7 +768,7 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
                   >
                     <div className="min-w-0">
                       <p className={`text-sm font-semibold truncate ${selectedProjectId === project.id ? 'text-indigo-900' : 'text-gray-700'}`}>{project.name}</p>
-                      <p className="text-xs text-gray-400">Project ID: {project.id.split('-')[1]}</p>
+                      <p className="text-xs text-gray-400">Project ID: {project.id}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {project.hasIssues && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
@@ -776,12 +792,12 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
                 historyProjects.map(project => (
                   <button
                     key={project.id}
-                    onClick={() => setSelectedProjectId(project.id)}
-                    className={`w-full text-left p-3 rounded-lg flex items-center justify-between group transition-all ${selectedProjectId === project.id ? 'bg-indigo-50 border border-indigo-100 shadow-sm' : 'hover:bg-gray-50 border border-transparent'}`}
+                    onClick={() => setHistoryProjectFilter(project.id)}
+                    className={`w-full text-left p-3 rounded-lg flex items-center justify-between group transition-all ${historyProjectFilter === project.id ? 'bg-indigo-50 border border-indigo-100 shadow-sm' : 'hover:bg-gray-50 border border-transparent'}`}
                   >
                     <div className="min-w-0">
                       <p className={`text-sm font-semibold truncate ${selectedProjectId === project.id ? 'text-indigo-900' : 'text-gray-700'}`}>{project.name}</p>
-                      <p className="text-xs text-gray-400">Project ID: {project.id.split('-')[1]}</p>
+                      <p className="text-xs text-gray-400">Project ID: {project.id}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {project.hasIssues && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
@@ -802,7 +818,7 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
               <div>
                 <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                   {selectedProject.name}
-                  {selectedProject.hasIssues && <AlertCircle className="w-5 h-5 text-amber-500" />}
+                  {selectedProject.hasIssues && <TriangleAlert className="w-5 h-5 text-amber-500" />}
                 </h1>
                 <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
                   <Clock className="w-3 h-3" /> {pendingLogs.length} entries awaiting review
