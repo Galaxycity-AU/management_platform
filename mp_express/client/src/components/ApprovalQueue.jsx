@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect, act } from 'react';
-import { 
-  Check, X, Briefcase, History, Edit2, Save, ArrowRight, Clock, 
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Check, X, Briefcase, History, Edit2, Save, ArrowRight, Clock,
   AlertCircle, Filter, RotateCcw, Calendar, ChevronRight, Zap,
-  CheckCircle2, SlidersHorizontal, User
+  CheckCircle2, SlidersHorizontal, User, Search
 } from 'lucide-react';
 import { LogStatus } from '../types';
 
@@ -16,18 +16,14 @@ const TimelineComparison = ({ log }) => {
   const actStart = log.actualStart || schedStart;
   const actEnd = log.actualEnd || schedEnd;
 
-  // Calculate view range
-  let minTime = new Date(Math.min(schedStart.getTime(), actStart.getTime()));
-  let maxTime = new Date(Math.max(schedEnd.getTime(), actEnd.getTime()));
+  // Calculate view range: lock to full 24h of the job day
+  const dayStart = new Date(schedStart);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setHours(23, 59, 59, 999);
 
-  // If we have original times that differ, include them in range calc
-  if (log.editEndTime && log.editEndTime.getTime() > maxTime.getTime()) {
-    maxTime = log.editEndTime;
-  }
-
-  // Padding
-  minTime = new Date(minTime.getTime() - 30 * 60000);
-  maxTime = new Date(maxTime.getTime() + 30 * 60000);
+  const minTime = dayStart;
+  const maxTime = dayEnd;
 
   const totalDuration = maxTime.getTime() - minTime.getTime();
   const getPos = (d) => ((d.getTime() - minTime.getTime()) / totalDuration) * 100;
@@ -37,17 +33,19 @@ const TimelineComparison = ({ log }) => {
   const schedDuration = schedEnd.getTime() - schedStart.getTime();
   const isOvertime = actDuration > schedDuration + 30 * 60000;
 
-  const actStartDisplay = log.editStartTime? log.editStartTime : actStart;
-  const actEndDisplay = log.editEndTime? log.editEndTime : actEnd;
+  const actStartDisplay = log.editStartTime ? log.editStartTime : actStart;
+  const actEndDisplay = log.editEndTime ? log.editEndTime : actEnd;
 
   const barColor = isOvertime ? 'bg-amber-500' : 'bg-indigo-500';
 
   return (
     <div className="flex flex-col w-full mt-2">
       <div className="relative h-14 w-full bg-gray-50 rounded-lg border border-gray-100 overflow-hidden">
-        {/* Grid lines */}
-        {Array.from({ length: 12 }).map((_, i) => {
-          const t = new Date(minTime.getTime() + i * 60 * 60000);
+        {/* Grid lines - every 2 hours for 24-hour view */}
+        {Array.from({ length: 13 }).map((_, i) => {
+          const hour = i * 2;
+          const t = new Date(minTime);
+          t.setHours(hour, 0, 0, 0);
           if (t > maxTime) return null;
           return (
             <div key={i} className="absolute top-0 bottom-0 w-px bg-gray-200 opacity-50" style={{ left: `${getPos(t)}%` }}></div>
@@ -102,6 +100,19 @@ const TimelineComparison = ({ log }) => {
         <span className={`absolute top-6 text-[9px] font-bold ml-1 ${isOvertime ? 'text-amber-600' : 'text-indigo-600'}`} style={{ left: `${getPos(actEnd)}%` }}>
         </span>
       </div>
+      {/* Hour labels */}
+      <div className="relative h-5 w-full mb-1">
+        {Array.from({ length: 25 }).map((_, i) => {
+          if (i % 2 !== 0) return null; // Show every 2 hours
+          const t = new Date(minTime);
+          t.setHours(i, 0, 0, 0);
+          return (
+            <div key={i} className="absolute text-[9px] text-gray-400 font-medium" style={{ left: `${getPos(t)}%`, transform: 'translateX(-50%)' }}>
+              {i.toString().padStart(2, '0')}:00
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -131,11 +142,14 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
   const originalActStart = log.actualStart;
   const originalActEnd = log.actualEnd;
 
-  // Calculate view range
-  let minTime = new Date(Math.min(schedStart.getTime(), actStart.getTime(), originalActStart.getTime()));
-  let maxTime = new Date(Math.max(schedEnd.getTime(), actEnd.getTime(), originalActEnd.getTime()));
-  minTime = new Date(minTime.getTime() - 30 * 60000);
-  maxTime = new Date(maxTime.getTime() + 30 * 60000);
+  // Calculate view range: lock to full 24h of the job day
+  const dayStart = new Date(schedStart);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const minTime = dayStart;
+  const maxTime = dayEnd;
 
   const totalDuration = maxTime.getTime() - minTime.getTime();
   const getPos = (d) => ((d.getTime() - minTime.getTime()) / totalDuration) * 100;
@@ -213,7 +227,7 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
 
   return (
     <div className="flex flex-col w-full mt-3">
-      <div className="text-[10px] text-gray-500 mb-1.5 flex items-center gap-2">
+      <div className="text-[10px] text-gray-500 mb-1.5 flex items-center gap-2 justify-between">
         <span className="font-medium">💡 Drag the timeline handles or bars to adjust times</span>
       </div>
       <div
@@ -221,13 +235,14 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
         className={`relative h-16 w-full bg-gray-50 rounded-lg border-2 border-gray-200 overflow-visible ${isDragging ? 'cursor-grabbing' : ''}`}
       >
         {/* Grid lines */}
-        {Array.from({ length: 12 }).map((_, i) => {
+        {Array.from({ length: 25 }).map((_, i) => {
           const t = new Date(minTime.getTime() + i * 60 * 60000);
           if (t > maxTime) return null;
+          const label = `${String(t.getHours()).padStart(2, '0')}:00`;
           return (
             <div key={i} className="absolute top-0 bottom-0 w-px bg-gray-300 opacity-40" style={{ left: `${getPos(t)}%` }}>
-              <span className="absolute -bottom-4 left-0 text-[9px] text-gray-400 -translate-x-1/2">
-                {t.getHours()}:00
+              <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] text-gray-400 whitespace-nowrap">
+                {label}
               </span>
             </div>
           );
@@ -235,7 +250,7 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
 
         {/* Scheduled Bar (Top) */}
         <div
-          className="absolute top-2 h-2 bg-gray-400 rounded-sm opacity-50"
+          className="absolute top-2 h-3 bg-gray-400 rounded-sm opacity-50"
           style={{ left: `${getPos(schedStart)}%`, width: `${getWidth(schedStart, schedEnd)}%` }}
         ></div>
 
@@ -317,213 +332,197 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
 };
 
 const LogApprovalCard = ({ log, onApprove, onReject }) => {
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  // Edit Mode State
-  const [isEditing, setIsEditing] = useState(false);
-  const [editStartTime, setEditStartTime] = useState(log.actualStart ? log.actualStart.toTimeString().slice(0, 5) : '');
-  const [editEndTime, setEditEndTime] = useState(log.actualEnd ? log.actualEnd.toTimeString().slice(0, 5) : '');
-  const [editReason, setEditReason] = useState('');
+  // Edit State
+  const [startTime, setStartTime] = useState(log.actualStart ? log.actualStart.toTimeString().slice(0, 5) : "00:00");
+  const [endTime, setEndTime] = useState(log.actualEnd ? log.actualEnd.toTimeString().slice(0, 5) : "00:00");
+  const [reason, setReason] = useState("");
 
-  const handleTimeChange = (newStart, newEnd) => {
-    setEditStartTime(newStart);
-    setEditEndTime(newEnd);
+  // Variance Calc
+  const sDur = log.scheduledEnd.getTime() - log.scheduledStart.getTime();
+  const aDur = (log.actualEnd?.getTime() || 0) - (log.actualStart?.getTime() || 0);
+  const diffMins = Math.round((aDur - sDur) / 60000);
+  const hasVariance = Math.abs(diffMins) > 15; // 15 min buffer
+
+  const formatTime = (d) => d ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
+
+  const handleSave = () => {
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+
+    const newStart = new Date(log.actualStart || new Date());
+    newStart.setHours(sh, sm);
+    const newEnd = new Date(log.actualEnd || new Date());
+    newEnd.setHours(eh, em);
+
+    onApprove(log.id, newStart, newEnd, reason || "Manual Adjustment");
+    setIsExpanded(false);
   };
-
-  const handleSaveAndApprove = () => {
-    if (!log.actualStart || !log.actualEnd) return;
-
-    // Reconstruct Date objects from time strings
-    const [startH, startM] = editStartTime.split(':').map(Number);
-    const [endH, endM] = editEndTime.split(':').map(Number);
-
-    const newStart = new Date(log.actualStart);
-    newStart.setHours(startH, startM);
-
-    const newEnd = new Date(log.actualEnd);
-    newEnd.setHours(endH, endM);
-
-    onApprove(log.id, newStart, newEnd, editReason || 'Manual adjustment');
-  };
-
-  const startDiff = log.actualStart ? (log.actualStart.getTime() - log.scheduledStart.getTime()) / 60000 : 0;
-  const endDiff = log.actualEnd ? (log.actualEnd.getTime() - log.scheduledEnd.getTime()) / 60000 : 0;
-  const hasIssues = startDiff > 10 || endDiff < -10 || endDiff > 15;
-
-  const quickReasons = [
-    'Timesheet incomplete',
-    'Wrong project / job code',
-    'Hours exceed schedule',
-    'Policy breach – needs clarification'
-  ];
 
   return (
-    <div className={`p-4 bg-white border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${hasIssues ? 'bg-amber-50/10' : ''}`}>
-      <div className="flex flex-col md:flex-row gap-4">
-        {/* Worker Info */}
-        <div className="w-full md:w-48 flex-shrink-0 flex items-center md:block gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
+    <div className={`transition-all duration-300 border-b border-gray-100 ${isExpanded ? 'bg-white shadow-lg z-10 my-4 rounded-xl border-transparent ring-1 ring-indigo-100' : 'bg-white hover:bg-gray-50'}`}>
+
+      {/* COLLAPSED ROW VIEW */}
+      {!isExpanded && (
+        <div className="flex items-center p-4 gap-4">
+          {/* 1. Worker Identity */}
+          <div className="w-48 flex items-center gap-3 flex-shrink-0">
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${hasVariance ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
               {log.workerName.charAt(0)}
             </div>
-            <div>
-              <p className="font-semibold text-gray-900 text-sm">{log.workerName}</p>
-              <p className="text-xs text-gray-500">{log.role}</p>
+            <div className="min-w-0">
+              <p className="font-semibold text-gray-900 text-sm truncate">{log.workerName}</p>
+              <p className="text-xs text-gray-500 truncate">{log.role}</p>
             </div>
           </div>
+
+          {/* 2. Quick Timeline Visualization */}
+          <div className="flex-1 min-w-[150px] flex flex-col justify-center gap-1">
+            <TimelineComparison log={log} />
+          </div>
+
+          {/* 3. Variance Stats */}
+          <div className="w-40 flex-shrink-0 text-center">
+            <div className="text-sm font-mono font-medium text-gray-700">
+              {formatTime(log.scheduledStart)} - {formatTime(log.scheduledEnd)}
+            </div>
+            <div className="text-sm font-mono font-medium text-gray-700">
+              {log.actualStart?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.actualEnd?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            {hasVariance ? (
+              <span className={`block text-xs font-bold ${diffMins > 0 ? 'text-amber-600' : 'text-blue-600'}`}>
+                {diffMins > 0 ? `+${diffMins}m Over` : `${diffMins}m Under`}
+              </span>
+            ) : (
+              <span className="text-xs text-green-600 font-medium flex items-center justify-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> On Time
+              </span>
+            )}
+          </div>
+
+          {/* 4. Quick Actions */}
+          <div className="w-30 flex items-center justify-end gap-2 pl-4 border-l border-gray-100">
+            <button
+              onClick={() => onApprove(log.id)}
+              className="p-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
+              title="Quick Approve"
+            >
+              <Check className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsExpanded(true)}
+              className="p-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+              title="Adjust / Edit"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* Main Content */}
-        <div className="flex-1 min-w-0">
-          {!isEditing ? (
-            <>
-              <div className="flex flex-col sm:flex-row justify-between text-xs mb-1 gap-1">
-                <span className="text-gray-400">Schedule vs Actual</span>
-                <div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
-                  <span>
-                    <span className="text-gray-400 mr-1">Act:</span>
-                    <span className={`font-bold ${hasIssues ? 'text-amber-600' : 'text-indigo-600'}`}>
-                      {log.actualStart?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.actualEnd?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </span>
-                </div>
+      {/* EXPANDED WORKBENCH VIEW */}
+      {isExpanded && (
+        <div className="p-6">
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-100 text-indigo-700 rounded-lg">
+                <Edit2 className="w-5 h-5" />
               </div>
-              <TimelineComparison log={log} />
-              {log.notes && (
-                <div className="mt-2 text-xs text-gray-600 bg-gray-100 p-2 rounded italic">
-                  "{log.notes}"
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-100">
-              <div className="flex items-center gap-2 mb-3 text-indigo-700 font-medium text-sm">
-                <Edit2 className="w-4 h-4" /> Adjust Time Log
-              </div>
-
-              {/* Interactive Timeline */}
-              <DraggableTimeline
-                log={log}
-                editStartTime={editStartTime}
-                editEndTime={editEndTime}
-                onTimeChange={handleTimeChange}
-              />
-
-              {/* Manual Time Inputs */}
-              <div className="mt-4 pt-4 border-t border-indigo-200">
-                <div className="text-xs text-gray-600 mb-2 font-medium">Or enter times manually:</div>
-                <div className="grid grid-cols-2 gap-4 mb-3">
-                  <div>
-                    <label className="text-xs text-gray-500 font-semibold uppercase">Start Time</label>
-                    <input
-                      type="time"
-                      value={editStartTime}
-                      onChange={(e) => setEditStartTime(e.target.value)}
-                      className="w-full mt-1 p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 font-semibold uppercase">End Time</label>
-                    <input
-                      type="time"
-                      value={editEndTime}
-                      onChange={(e) => setEditEndTime(e.target.value)}
-                      className="w-full mt-1 p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div>
-                <label className="text-xs text-gray-500 font-semibold uppercase">Reason for Adjustment</label>
+                <h3 className="text-lg font-bold text-gray-900">Adjust Time Entry</h3>
+                <p className="text-sm text-gray-500">Modify start/end times for <span className="font-semibold text-gray-700">{log.workerName}</span>.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="text-gray-400 hover:text-gray-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="space-y-6 w-full">
+            {/* Timeline */}
+            <DraggableTimeline
+              log={log}
+              editStartTime={startTime}
+              editEndTime={endTime}
+              onTimeChange={(s, e) => { setStartTime(s); setEndTime(e); }}
+            />
+
+            {/* Start & End Time Inputs */}
+            <div className="grid grid-cols-2 gap-4 w-full">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Start Time</label>
                 <input
-                  type="text"
-                  placeholder="e.g. Lunch break not recorded, Policy adjustment..."
-                  value={editReason}
-                  onChange={(e) => setEditReason(e.target.value)}
-                  className="w-full mt-1 p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-indigo-500"
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg bg-white font-mono text-sm focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <button onClick={() => setIsEditing(false)} className="text-xs text-gray-500 hover:text-gray-700 px-3 py-2">Cancel</button>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">End Time</label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg bg-white font-mono text-sm focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Adjustment Details - Full Width */}
+            <div className="bg-gray-50 rounded-xl p-5 border border-gray-200 w-full">
+              <h4 className="text-sm font-bold text-gray-800 mb-4">Adjustment Details</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <button
-                  onClick={handleSaveAndApprove}
-                  className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs font-medium"
+                  onClick={() => {
+                    setStartTime(log.scheduledStart.toTimeString().slice(0, 5));
+                    setEndTime(log.scheduledEnd.toTimeString().slice(0, 5));
+                    setReason("Reverted to Schedule");
+                  }}
+                  className="text-left px-3 py-2 bg-white border border-gray-200 rounded text-xs text-gray-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center gap-2"
                 >
-                  <Save className="w-3 h-3" /> Save & Approve
+                  <History className="w-3 h-3" /> Match Schedule
+                </button>
+                <button
+                  onClick={() => {
+                    setStartTime(log.actualStart?.toTimeString().slice(0, 5) || "");
+                    setEndTime(log.actualEnd?.toTimeString().slice(0, 5) || "");
+                    setReason("");
+                  }}
+                  className="text-left px-3 py-2 bg-white border border-gray-200 rounded text-xs text-gray-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center gap-2"
+                >
+                  <RotateCcw className="w-3 h-3" /> Reset to Original
                 </button>
               </div>
-            </div>
-          )}
-        </div>
 
-        {/* Actions */}
-        {!isEditing && (
-          <div className="flex flex-row md:flex-col items-center gap-2 md:w-28 md:pl-4 md:border-l md:border-gray-100">
-            <button onClick={() => onApprove(log.id)} className="w-full flex items-center justify-center gap-1 bg-green-50 text-green-700 hover:bg-green-100 p-2 rounded-lg text-xs font-medium transition-colors">
-              <Check className="w-4 h-4" /> Approve
-            </button>
-            <button onClick={() => setIsEditing(true)} className="w-full flex items-center justify-center gap-1 bg-gray-50 text-gray-700 hover:bg-gray-100 p-2 rounded-lg text-xs font-medium transition-colors">
-              <Edit2 className="w-4 h-4" /> Adjust
-            </button>
-            <button onClick={() => setShowRejectModal(true)} className="w-full flex items-center justify-center gap-1 bg-red-50 text-red-700 hover:bg-red-100 p-2 rounded-lg text-xs font-medium transition-colors">
-              <X className="w-4 h-4" /> Reject
-            </button>
-          </div>
-        )}
-      </div>
-
-      {showRejectModal && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-lg w-full p-6">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5">
-                <X className="w-5 h-5 text-red-500" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">Reject time entry</h3>
-                <p className="text-sm text-gray-600 mt-1">Add a quick reason so the worker knows what to fix.</p>
-
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  {quickReasons.map(reason => (
-                    <button
-                      key={reason}
-                      onClick={() => setRejectReason(reason)}
-                      className="text-left text-xs px-3 py-2 border border-gray-200 rounded-lg hover:border-red-200 hover:bg-red-50/60 transition-colors"
-                    >
-                      {reason}
-                    </button>
-                  ))}
-                </div>
-
-                <label className="block text-xs font-semibold text-gray-700 mt-4 mb-1">Reason</label>
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Reason</label>
                 <textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  rows={3}
-                  placeholder="e.g. Missing break time, shift overlaps another job, or add more detail"
-                  className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg text-sm h-20 resize-none"
+                  placeholder="e.g. Forgot to clock out..."
                 />
+              </div>
 
-                <div className="flex justify-end gap-2 mt-4">
-                  <button
-                    onClick={() => { setShowRejectModal(false); setRejectReason(''); }}
-                    className="text-sm text-gray-600 px-3 py-2 hover:text-gray-800"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      onReject(log.id, rejectReason || 'Rejected - no reason provided');
-                      setShowRejectModal(false);
-                      setRejectReason('');
-                    }}
-                    className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
-                  >
-                    <X className="w-4 h-4" /> Confirm Reject
-                  </button>
-                </div>
+              <div className="pt-4 border-t border-gray-200 flex gap-3">
+                <button
+                  onClick={() => onReject(log.id, reason)}
+                  className="flex-1 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex-1 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg text-sm font-bold shadow-sm transition-transform active:scale-[0.98]"
+                >
+                  Save & Approve
+                </button>
               </div>
             </div>
           </div>
@@ -562,13 +561,18 @@ const HistoryLogCard = ({ log }) => {
           {/* Job Date - Top Right */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1 font-medium">
+                <span className="text-gray-500 text-xs">
+                    Sched: {log.scheduledStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.scheduledEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
               {(isAdjusted || log.editReason) ? (
-                <div className="bg-red-50 p-2 rounded border border-red-100 flex items-start gap-3">
+                <div className="bg-yellow-50 p-2 rounded border border-yellow-100 flex items-start gap-3">
                   <div className="mt-0.5">
-                    <Edit2 className="w-3 h-3 text-red-600" />
+                    <Edit2 className="w-3 h-3 text-yellow-600" />
                   </div>
 
-                  <div className="text-xs text-red-800">
+                  <div className="text-xs text-yellow-800">
                     {isAdjusted && (
                       <div className="flex items-center gap-2 mb-1 font-medium">
                         <span className="text-gray-500 line-through decoration-red-400">
@@ -628,6 +632,8 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
   const [activeTab, setActiveTab] = useState('PENDING');
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [historyProjectFilter, setHistoryProjectFilter] = useState('all');
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('ALL');
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   const pendingLogs = useMemo(() => logs.filter(l => l.status === LogStatus.WAITING_APPROVAL), [logs]);
   const historyLogs = useMemo(() => logs.filter(l => l.status === LogStatus.APPROVED || l.status === LogStatus.REJECTED).sort((a, b) => (b.actualEnd?.getTime() || 0) - (a.actualEnd?.getTime() || 0)), [logs]);
@@ -684,174 +690,256 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
     return pendingLogs.filter(log => log.projectId === selectedProjectId);
   }, [pendingLogs, selectedProjectId]);
 
+  // Filtered History
   const filteredHistoryLogs = useMemo(() => {
-    if (historyProjectFilter === 'all') return historyLogs;
-    return historyLogs.filter(log => log.projectId === historyProjectFilter);
-  }, [historyLogs, historyProjectFilter]);
+    return historyLogs.filter(log => {
+        const matchesProject = historyProjectFilter === 'all' || log.projectId === historyProjectFilter;
+        const matchesStatus = historyStatusFilter === 'ALL' || 
+                              (historyStatusFilter === 'APPROVED' && log.status === LogStatus.APPROVED) ||
+                              (historyStatusFilter === 'REJECTED' && log.status === LogStatus.REJECTED);
+        const matchesSearch = log.workerName.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+                              log.role.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+                              log.projectName.toLowerCase().includes(historySearchTerm.toLowerCase());
+        
+        return matchesProject && matchesStatus && matchesSearch;
+    });
+  }, [historyLogs, historyProjectFilter, historyStatusFilter, historySearchTerm]);
+
+  // Stats for history view
+  const historyStats = useMemo(() => {
+      const total = filteredHistoryLogs.length;
+      const approved = filteredHistoryLogs.filter(l => l.status === LogStatus.APPROVED).length;
+      const rejected = filteredHistoryLogs.filter(l => l.status === LogStatus.REJECTED).length;
+      return { total, approved, rejected };
+  }, [filteredHistoryLogs]);
 
   const selectedProject = pendingProjects.find(p => p.id === selectedProjectId);
 
   return (
-    <div className="space-y-6 pb-20 md:pb-0">
-      {/* Tabs */}
-      <div className="border-b border-gray-200 flex gap-6">
-        <button
-          onClick={() => setActiveTab('PENDING')}
-          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'PENDING' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-        >
-          <Clock className="w-4 h-4" />
-          Pending Reviews
-          {pendingLogs.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{pendingLogs.length}</span>}
-        </button>
-        <button
-          onClick={() => setActiveTab('HISTORY')}
-          className={`pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'HISTORY' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-        >
-          <History className="w-4 h-4" />
-          History
-          {historyLogs.length > 0 && <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">{filteredHistoryLogs.length}</span>}
-        </button>
+    <div className="flex h-full w-[100%] bg-gray-50 overflow-hidden rounded-lg shadow-lg border border-gray-200">
+      {/* SIDEBAR */}
+      <div className="w-72 bg-white border-r border-gray-200 flex flex-col z-10">
+        <div className="p-5 border-b border-gray-100 bg-gray-50/50">
+          <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setActiveTab('PENDING')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'PENDING' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Pending ({pendingLogs.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('HISTORY')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'HISTORY' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              History
+            </button>
+          </div>
+        </div>
+        <div className='flex-1 overflow-y-auto p-3 space-y-1'>
+          {
+            activeTab === 'PENDING' && (
+              pendingLogs.length === 0 ? (
+                <div className="text-center p-8 text-gray-400">
+                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-300" />
+                  <p className="text-sm">All caught up!</p>
+                </div>
+              ) : (
+                pendingProjects.map(project => (
+                  <button
+                    key={project.id}
+                    onClick={() => setSelectedProjectId(project.id)}
+                    className={`w-full text-left p-3 rounded-lg flex items-center justify-between group transition-all ${selectedProjectId === project.id ? 'bg-indigo-50 border border-indigo-100 shadow-sm' : 'hover:bg-gray-50 border border-transparent'}`}
+                  >
+                    <div className="min-w-0">
+                      <p className={`text-sm font-semibold truncate ${selectedProjectId === project.id ? 'text-indigo-900' : 'text-gray-700'}`}>{project.name}</p>
+                      <p className="text-xs text-gray-400">Project ID: {project.id.split('-')[1]}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {project.hasIssues && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${selectedProjectId === project.id ? 'bg-indigo-200 text-indigo-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {project.count}
+                      </span>
+                    </div>
+                  </button>
+                ))
+              )
+            )}
+          {/* History placeholder */}
+          {
+            activeTab === 'HISTORY' && (
+              historyLogs.length === 0 ? (
+                <div className="text-center p-8 text-gray-400">
+                  <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-300" />
+                  <p className="text-sm">All caught up!</p>
+                </div>
+              ) : (
+                historyProjects.map(project => (
+                  <button
+                    key={project.id}
+                    onClick={() => setSelectedProjectId(project.id)}
+                    className={`w-full text-left p-3 rounded-lg flex items-center justify-between group transition-all ${selectedProjectId === project.id ? 'bg-indigo-50 border border-indigo-100 shadow-sm' : 'hover:bg-gray-50 border border-transparent'}`}
+                  >
+                    <div className="min-w-0">
+                      <p className={`text-sm font-semibold truncate ${selectedProjectId === project.id ? 'text-indigo-900' : 'text-gray-700'}`}>{project.name}</p>
+                      <p className="text-xs text-gray-400">Project ID: {project.id.split('-')[1]}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {project.hasIssues && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
+                    </div>
+                  </button>
+                ))
+              )
+            )
+          }
+        </div>
       </div>
-
-      {activeTab === 'PENDING' && (
-        <>
-          {pendingLogs.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center mt-8">
-              <div className="bg-green-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check className="w-8 h-8 text-green-500" />
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col min-w-0 bg-white">
+        {selectedProjectId && selectedProject && activeTab === 'PENDING' ? (
+          <>
+            {/* Sticky Header */}
+            <div className="px-8 py-5 border-b border-gray-200 bg-white flex justify-between items-center sticky top-0 z-20 shadow-sm">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  {selectedProject.name}
+                  {selectedProject.hasIssues && <AlertCircle className="w-5 h-5 text-amber-500" />}
+                </h1>
+                <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+                  <Clock className="w-3 h-3" /> {pendingLogs.length} entries awaiting review
+                </p>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900">All Caught Up!</h3>
-              <p className="text-gray-500 mt-2">No pending time logs to approve.</p>
+
+              {/* Smart Actions
+              {cleanLogs.length > 0 && (
+                <button
+                  onClick={handleBatchApprove}
+                  className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 px-4 py-2 rounded-lg text-sm font-bold transition-all"
+                >
+                  <Zap className="w-4 h-4 fill-emerald-500 text-emerald-500" />
+                  Auto-Approve {cleanLogs.length} Clean Entries
+                </button>
+              )} */}
             </div>
-          ) : (
-            <div className="flex gap-6">
-              {/* Left Sidebar - Project List */}
-              <div className="w-80 flex-shrink-0">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden sticky top-4">
-                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-3 border-b border-gray-200">
-                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                      <Briefcase className="w-4 h-4 text-indigo-600" />
-                      Projects
+
+            {/* Progress Bar */}
+            <div className="h-1 w-full bg-gray-100">
+              <div
+                className="h-full bg-indigo-500 transition-all duration-500"
+                style={{ width: `${Math.max(5, (selectedProject ? ((selectedProject.count - selectedProjectLogs.length) / Math.max(selectedProject.count, 1)) * 100 : 5))}%` }}
+              />
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="w-48 text-center">Worker</div>
+                  <div className="flex-1 text-center">Timeline Comparison</div>
+                  {/* <div className="flex-2 text-center">Actuals</div> */}
+                  <div className="w-50 text-center pl-4">Actions</div>
+                </div>
+                <div className="divide-y divide-gray-100 bg-white">
+                  {selectedProjectLogs.map(log => (
+                    <LogApprovalCard key={log.id} log={log} onApprove={onApprove} onReject={onReject} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {activeTab === 'HISTORY' && (
+              <div className="space-y-4 p-4">
+                {/* Advanced Filter Bar */}
+                <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    {/* Search */}
+                    <div className="md:col-span-5 relative">
+                      <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search worker, role or project..."
+                        value={historySearchTerm}
+                        onChange={(e) => setHistorySearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Project Filter */}
+                    <div className="md:col-span-3">
+                      <select
+                        value={historyProjectFilter}
+                        onChange={(e) => setHistoryProjectFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="all">All Projects</option>
+                        {historyProjects.map(project => (
+                          <option key={project.id} value={project.id}>
+                            {project.name.length > 20 ? project.name.substring(0, 20) + '...' : project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Status Filter Toggle */}
+                    <div className="md:col-span-4 flex bg-gray-100 p-1 rounded-lg">
+                      <button
+                        onClick={() => setHistoryStatusFilter('ALL')}
+                        className={`flex-1 text-xs font-medium rounded py-1.5 transition-all ${historyStatusFilter === 'ALL' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                      >
+                        All
+                      </button>
+                      <button
+                        onClick={() => setHistoryStatusFilter('APPROVED')}
+                        className={`flex-1 text-xs font-medium rounded py-1.5 transition-all ${historyStatusFilter === 'APPROVED' ? 'bg-white shadow text-emerald-700' : 'text-gray-500 hover:text-gray-700'}`}
+                      >
+                        Approved
+                      </button>
+                      <button
+                        onClick={() => setHistoryStatusFilter('REJECTED')}
+                        className={`flex-1 text-xs font-medium rounded py-1.5 transition-all ${historyStatusFilter === 'REJECTED' ? 'bg-white shadow text-red-700' : 'text-gray-500 hover:text-gray-700'}`}
+                      >
+                        Rejected
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* History Logs */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                    <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+                      <History className="w-4 h-4 text-gray-400" /> Recent Decisions
                     </h3>
+                    <div className="flex gap-3 text-xs">
+                      <span className="flex items-center gap-1 text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                        <Check className="w-3 h-3" /> {historyStats.approved} Approved
+                      </span>
+                      <span className="flex items-center gap-1 text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+                        <X className="w-3 h-3" /> {historyStats.rejected} Rejected
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
-                    {pendingProjects.length === 0 ? (
-                      <div className="p-8 text-center text-gray-400">
-                        <Check className="w-12 h-12 mx-auto mb-2 text-green-400" />
-                        <p className="text-sm">All caught up!</p>
-                      </div>
-                    ) : (
-                      pendingProjects.map(project => (
-                        <button
-                          key={project.id}
-                          onClick={() => setSelectedProjectId(project.id)}
-                          className={`w-full text-left p-4 transition-colors ${selectedProjectId === project.id
-                            ? 'bg-indigo-50 border-l-4 border-indigo-600'
-                            : 'hover:bg-gray-50 border-l-4 border-transparent'
-                            }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 truncate">{project.name}</p>
-                              <p className="text-xs text-gray-500 mt-1">
-                                {project.count} {project.count === 1 ? 'entry' : 'entries'}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {project.hasIssues && (
-                                <AlertCircle className="w-4 h-4 text-amber-500" />
-                              )}
-                              <span className={`px-2 py-1 rounded-full text-xs font-bold ${selectedProjectId === project.id
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-gray-200 text-gray-700'
-                                }`}>
-                                {project.count}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
+                  <div className="divide-y divide-gray-100">
+                    {filteredHistoryLogs.length > 0 ? (
+                      filteredHistoryLogs.map(log => (
+                        <HistoryLogCard key={log.id} log={log} />
                       ))
+                    ) : (
+                      <div className="p-12 text-center text-gray-400">
+                        <Filter className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                        <p>No records found matching your filters.</p>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
+            )}
+          </>
+        )}
 
-              {/* Right Side - Selected Project Details */}
-              <div className="flex-1">
-                {selectedProjectId && selectedProject ? (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-xl font-bold text-gray-900">{selectedProject.name}</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {selectedProjectLogs.length} time {selectedProjectLogs.length === 1 ? 'entry' : 'entries'} pending approval
-                          </p>
-                        </div>
-                        {selectedProject.hasIssues && (
-                          <div className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            Has Issues
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="divide-y divide-gray-100">
-                      {selectedProjectLogs.map(log => (
-                        <LogApprovalCard key={log.id} log={log} onApprove={onApprove} onReject={onReject} />
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-                    <Briefcase className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">Select a project to view time entries</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {activeTab === 'HISTORY' && (
-        <div className="space-y-4">
-          {/* Filter */}
-          <div className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 p-4">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <label className="text-sm font-medium text-gray-700">Filter by Project:</label>
-            <select
-              value={historyProjectFilter}
-              onChange={(e) => setHistoryProjectFilter(e.target.value)}
-              className="flex-1 max-w-xs px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="all">All Projects ({historyLogs.length})</option>
-              {historyProjects.map(project => (
-                <option key={project.id} value={project.id}>
-                  {project.name} ({historyLogs.filter(l => l.projectId === project.id).length})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* History Logs */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-              <h3 className="font-bold text-gray-800">Recent Decisions</h3>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {filteredHistoryLogs.map(log => (
-                <HistoryLogCard key={log.id} log={log} />
-              ))}
-              {filteredHistoryLogs.length === 0 && (
-                <div className="p-8 text-center text-gray-400">No history available yet.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
-};
+}

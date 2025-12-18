@@ -123,9 +123,6 @@ function ProjectsPage() {
 
     return (
         <div className="max-w-full">
-            <div className="mb-4">
-                <h2 className="text-xl font-bold text-gray-800">Projects</h2>
-            </div>
             <ProjectTable 
                 projects={projects} 
                 onSelectProject={handleSelectProject} 
