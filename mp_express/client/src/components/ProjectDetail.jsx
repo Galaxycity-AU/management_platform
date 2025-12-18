@@ -12,8 +12,14 @@ const formatTime = (date) => {
 const WorkerGanttChart = ({ logs, currentDate }) => {
     const [hoveredLog, setHoveredLog] = React.useState(null);
     const [scrollLeft, setScrollLeft] = React.useState(0);
+    const [now, setNow] = useState(() => new Date());
     const headerScrollRef = React.useRef(null);
     const rowScrollRefs = React.useRef(new Map());
+
+    useEffect(() => {
+        const id = setInterval(() => setNow(new Date()), 30 * 1000);
+        return () => clearInterval(id);
+    }, []);
 
     // Synchronize scroll across all timeline elements
     const handleScroll = (e, sourceId) => {
@@ -69,7 +75,6 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
         markers.push(time);
     }
 
-    const now = new Date();
     const isToday = currentDate.getDate() === now.getDate() &&
         currentDate.getMonth() === now.getMonth() &&
         currentDate.getFullYear() === now.getFullYear();
@@ -141,8 +146,8 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                     // A shift is "live" if it's ACTIVE status and has no actual end time (regardless of start date)
                     // Also consider it live if it has an actual start time but no end time, even if status isn't explicitly ACTIVE yet
                     const isLive = (!log.actualEnd && log.status === LogStatus.ACTIVE) || (!log.actualEnd && log.actualStart);
-                    // For active status, extend to current time if viewing today; otherwise use scheduled end
-                    const actualEnd = log.actualEnd || now;
+                    // For active status, extend to current time only if viewing today
+                    const actualEnd = log.actualEnd || (isToday ? now : maxTime);
 
                     // For carry-forward tasks, actual bar should start from beginning of current day
                     const actualLeft = isCarryForward && isLive ? 0 : getPos(actualStart);
@@ -448,15 +453,13 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
         // Include if scheduled start is on the selected date
         const startsOnDate = schedStart.getTime() === viewDate.getTime();
 
-        // Include if it's an active shift that started before and hasn't ended yet
-        const isOngoingFromBefore = l.status === LogStatus.ACTIVE &&
-            l.actualStart &&
+        // Include if it's an ongoing shift that started before and hasn't ended yet.
+        // Don't rely on status, because status can be stale while actualStart/actualEnd are accurate.
+        const isOngoingFromBefore = Boolean(l.actualStart) &&
             !l.actualEnd &&
             schedStart < viewDate;
 
-        const todayIncludeOngoing = viewDate < new Date() ? isOngoingFromBefore : null;
-
-        return startsOnDate || todayIncludeOngoing;
+        return startsOnDate || isOngoingFromBefore;
     });
 
     // Calculate staffing summary for the SELECTED date (not just today)
