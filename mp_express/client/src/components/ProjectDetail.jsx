@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, User, TriangleAlert, Clock, DollarSign, ArrowLeft, MoreHorizontal, Plus, FileText, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { ProjectStatus, LogStatus } from '../types';
+import { DB_API_BASE_URL } from '../utils/apiUtils';
 
 // --- Worker Gantt Component (Reused logic) ---
 const formatTime = (date) => {
@@ -367,61 +368,133 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
 export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
     const [activeTab, setActiveTab] = useState('LIVE');
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [dailyNotes, setDailyNotes] = useState({});
+    const [note, setNote] = useState('');
+    const [savedNote, setSavedNote] = useState(''); // Track the saved note content
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const [updatedByName, setUpdatedByName] = useState(null);
     const [noteSaved, setNoteSaved] = useState(false);
-    const [noteLastUpdated, setNoteLastUpdated] = useState({});
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const textareaRef = React.useRef(null);
 
     console.log('ProjectDetail Props:', { project, logs });
 
-    // Helper function to create consistent date key for storage
-    const getDateKey = (date) => {
-        return date.toISOString().split('T')[0];
+    // Fetch note when component mounts or project changes
+    useEffect(() => {
+        if (project?.id) {
+            fetchNote();
+        }
+    }, [project?.id]);
+
+    // Fetch note from backend
+    const fetchNote = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            const response = await fetch(`${DB_API_BASE_URL}/projects/${project.id}/note`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch note');
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.note) {
+                const noteContent = data.note.note || '';
+                setNote(noteContent);
+                setSavedNote(noteContent); // Track saved content
+                setLastUpdated(data.note.note_updated_at);
+                setUpdatedByName(data.note.updated_by_name);
+            }
+        } catch (err) {
+            console.error('Error fetching note:', err);
+            setError('Failed to load note');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    // Get notes for current date
-    const currentDateKey = getDateKey(currentDate);
-    const currentNotes = dailyNotes[currentDateKey] || '';
+    // Format current date as [DD-MM-YYYY]
+    const getCurrentDateString = () => {
+        const now = new Date();
+        const day = String(now.getDate()).padStart(2, '0');
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        return `[${day}-${month}-${year}]`;
+    };
+
+    // Handle textarea click - append date with newline at the end
+    const handleTextareaClick = (e) => {
+        const dateString = getCurrentDateString();
+        
+        // Append newline and date at the end of the text
+        const newNote = note + (note ? '\n' : '') + dateString + ' ';
+        setNote(newNote);
+        setNoteSaved(false);
+        
+        // Set cursor position at the end after the inserted date
+        setTimeout(() => {
+            const textarea = e.target;
+            const newPosition = newNote.length;
+            textarea.setSelectionRange(newPosition, newPosition);
+            textarea.focus();
+        }, 0);
+    };
 
     // Handle notes change
     const handleNotesChange = (value) => {
-        setDailyNotes(prev => ({
-            ...prev,
-            [currentDateKey]: value
-        }));
-        // Clear the saved feedback when user edits
+        setNote(value);
         setNoteSaved(false);
     };
 
     // Handle save notes
-    const handleSaveNotes = () => {
-        if (currentNotes.trim()) {
-            setNoteLastUpdated(prev => ({
-                ...prev,
-                [currentDateKey]: new Date()
-            }));
-            setNoteSaved(true);
-            // Clear saved feedback after 2 seconds
-            setTimeout(() => setNoteSaved(false), 2000);
-            // In a real app, you'd save to backend/localStorage here
-            console.log(`Notes saved for ${currentDateKey}:`, currentNotes);
+    const handleSaveNotes = async () => {
+        if (!note.trim()) return;
+        
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const response = await fetch(`${DB_API_BASE_URL}/projects/${project.id}/note`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content: note,
+                    updatedBy: null // TODO: Get current user ID from context/auth
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save note');
+            }
+
+            const data = await response.json();
+
+            if (data.success) {
+                setLastUpdated(data.note.note_updated_at);
+                setUpdatedByName(data.note.updated_by_name);
+                setSavedNote(note); // Update saved content
+                setNoteSaved(true);
+                
+                // Hide "Saved" indicator after 3 seconds
+                setTimeout(() => setNoteSaved(false), 3000);
+            }
+        } catch (err) {
+            console.error('Error saving note:', err);
+            setError('Failed to save note');
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    // Handle clear notes
-    const handleClearNotes = () => {
-        if (window.confirm('Are you sure you want to clear these notes?')) {
-            setDailyNotes(prev => {
-                const updated = { ...prev };
-                delete updated[currentDateKey];
-                return updated;
-            });
-            setNoteLastUpdated(prev => {
-                const updated = { ...prev };
-                delete updated[currentDateKey];
-                return updated;
-            });
-        }
-    };
 
     // Navigation Handlers
     const handlePrevDay = () => {
@@ -780,7 +853,7 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
                                         </div>
                                     </div>
 
-                                    {/* Daily Notes Section */}
+                                    {/* Project Notes Section */}
                                     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
                                             <div className="flex items-center gap-3">
@@ -788,10 +861,14 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
                                                     <FileText className="w-5 h-5 text-indigo-600" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-semibold text-lg text-gray-800">Daily Notes</h4>
-                                                    {noteLastUpdated[currentDateKey] && (
+                                                    <h4 className="font-semibold text-lg text-gray-800">Project Notes</h4>
+                                                    {lastUpdated && (
                                                         <p className="text-xs text-gray-500 mt-0.5">
-                                                            Updated {noteLastUpdated[currentDateKey].toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            Updated {new Date(lastUpdated).toLocaleTimeString([], { 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })}
+                                                            {updatedByName && ` by ${updatedByName}`}
                                                         </p>
                                                     )}
                                                 </div>
@@ -803,30 +880,28 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
                                                 </div>
                                             )}
                                         </div>
+
+                                        {error && (
+                                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                                {error}
+                                            </div>
+                                        )}
+
                                         <div className="space-y-3">
                                             <textarea
-                                                value={currentNotes}
+                                                ref={textareaRef}
+                                                value={note}
                                                 onChange={(e) => handleNotesChange(e.target.value)}
-                                                maxLength={500}
-                                                className="w-full min-h-[200px] p-4 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y text-sm text-gray-700 placeholder-gray-400"
+                                                onClick={handleTextareaClick}
+                                                disabled={isLoading}
+                                                className="w-full min-h-[330px] p-4 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y text-sm text-gray-700 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
                                                 placeholder="Add notes about today's operations, issues, achievements, or important updates..."
                                             />
                                             <div className="flex items-center justify-between">
-                                                <div className="text-xs text-gray-500">
-                                                    {currentNotes.length} / 500 characters
-                                                </div>
                                                 <div className="flex gap-2">
-                                                    {currentNotes.trim() && (
-                                                        <button
-                                                            onClick={handleClearNotes}
-                                                            className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200"
-                                                        >
-                                                            Clear
-                                                        </button>
-                                                    )}
                                                     <button
                                                         onClick={handleSaveNotes}
-                                                        disabled={!currentNotes.trim()}
+                                                        disabled={isLoading || !note.trim()}
                                                         className="px-4 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                                     >
                                                         <CheckCircle2 className="w-3 h-3" />

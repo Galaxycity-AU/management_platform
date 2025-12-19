@@ -278,3 +278,226 @@ export const updateProjectSchedules = async (req, res) => {
     }
 };
 
+
+// ============================================================
+// BACKEND API ROUTES
+// ============================================================
+
+// Get project note
+router.get('/projects/:projectId/note', async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const note = await getProjectNote(projectId);
+        res.json({ success: true, note });
+    } catch (error) {
+        console.error('Error fetching note:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Save/Update project note
+router.post('/projects/:projectId/note', async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const { content, updatedBy } = req.body;
+        
+        if (content === null || content === undefined) {
+            return res.status(400).json({ success: false, error: 'Content is required' });
+        }
+        
+        await saveProjectNote(projectId, content.trim(), updatedBy);
+        const note = await getProjectNote(projectId);
+        
+        res.json({ success: true, note });
+    } catch (error) {
+        console.error('Error saving note:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================================
+// DATABASE FUNCTIONS
+// ============================================================
+
+// Get project note
+async function getProjectNote(projectId) {
+    const query = `
+        SELECT 
+            p.id as project_id,
+            p.note,
+            p.note_updated_at,
+            p.note_updated_by,
+            w.name as updated_by_name
+        FROM projects p
+        LEFT JOIN workers w ON p.note_updated_by = w.id
+        WHERE p.id = ?
+    `;
+    const [rows] = await db.execute(query, [projectId]);
+    return rows[0] || null;
+}
+
+// Save/Update project note
+async function saveProjectNote(projectId, content, updatedBy = null) {
+    const query = `
+        UPDATE projects 
+        SET 
+            note = ?,
+            note_updated_at = CURRENT_TIMESTAMP,
+            note_updated_by = ?
+        WHERE id = ?
+    `;
+    await db.execute(query, [content, updatedBy, projectId]);
+}
+
+// ============================================================
+// REACT COMPONENT - Simplified Single Note
+// ============================================================
+
+function ProjectNote({ projectId, currentUserId }) {
+    const [note, setNote] = useState('');
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const [updatedByName, setUpdatedByName] = useState(null);
+    const [noteSaved, setNoteSaved] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    // Fetch note when component mounts
+    useEffect(() => {
+        if (projectId) {
+            fetchNote();
+        }
+    }, [projectId]);
+
+    // Fetch note
+    const fetchNote = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+            
+            const response = await axios.get(`${API_BASE_URL}/projects/${projectId}/note`);
+            
+            if (response.data.success && response.data.note) {
+                setNote(response.data.note.note || '');
+                setLastUpdated(response.data.note.note_updated_at);
+                setUpdatedByName(response.data.note.updated_by_name);
+            }
+        } catch (err) {
+            console.error('Error fetching note:', err);
+            setError('Failed to load note');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Handle note change
+    const handleNoteChange = (value) => {
+        setNote(value);
+        setNoteSaved(false);
+    };
+
+    // Save note
+    const handleSaveNote = async () => {
+        try {
+            setIsLoading(true);
+            setError(null);
+
+            const response = await axios.post(`${API_BASE_URL}/projects/${projectId}/note`, {
+                content: note,
+                updatedBy: currentUserId
+            });
+
+            if (response.data.success) {
+                setLastUpdated(response.data.note.note_updated_at);
+                setUpdatedByName(response.data.note.updated_by_name);
+                setNoteSaved(true);
+                
+                // Hide "Saved" indicator after 3 seconds
+                setTimeout(() => setNoteSaved(false), 3000);
+            }
+        } catch (err) {
+            console.error('Error saving note:', err);
+            setError('Failed to save note');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Clear note
+    const handleClearNote = () => {
+        setNote('');
+        setNoteSaved(false);
+    };
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-50 rounded-lg">
+                        <FileText className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                        <h4 className="font-semibold text-lg text-gray-800">Project Notes</h4>
+                        {lastUpdated && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                                Updated {new Date(lastUpdated).toLocaleTimeString([], { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                })}
+                                {updatedByName && ` by ${updatedByName}`}
+                            </p>
+                        )}
+                    </div>
+                </div>
+                {noteSaved && (
+                    <div className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Saved
+                    </div>
+                )}
+            </div>
+
+            {error && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    {error}
+                </div>
+            )}
+
+            <div className="space-y-3">
+                <textarea
+                    value={note}
+                    onChange={(e) => handleNoteChange(e.target.value)}
+                    maxLength={500}
+                    disabled={isLoading}
+                    className="w-full min-h-[200px] p-4 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y text-sm text-gray-700 placeholder-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    placeholder="Add notes about today's operations, issues, achievements, or important updates..."
+                />
+                <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-500">
+                        {note.length} / 500 characters
+                    </div>
+                    <div className="flex gap-2">
+                        {note.trim() && (
+                            <button
+                                onClick={handleClearNote}
+                                disabled={isLoading}
+                                className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Clear
+                            </button>
+                        )}
+                        <button
+                            onClick={handleSaveNote}
+                            disabled={isLoading}
+                            className="px-4 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                        >
+                            <CheckCircle2 className="w-3 h-3" />
+                            {isLoading ? 'Saving...' : 'Save Notes'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export default ProjectNote;

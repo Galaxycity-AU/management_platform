@@ -1,5 +1,5 @@
 import * as simproService from '../service/simproService.js';
-import { syncLogs } from '../service/simproLogServices.js';
+import {syncLogs, processLogsFromDatabase} from '../service/simproLogServices.js';
 
 export const getJobById = async (req, res) => {
     try {
@@ -37,3 +37,22 @@ export const getMobileStatusLog = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
+
+export const processLogsfromDB = async (req, res) => {
+    try {
+        const data = await processLogsFromDatabase();
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
+// export const storeSimProLogToDb = async (req, res) => {
+//     try {
+//         const data = await getLogsFromDatabase();
+//         res.json(data);
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// };

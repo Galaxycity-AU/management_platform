@@ -179,6 +179,32 @@ const API_Testing = () => {
     }
   }
 
+  const handleGetProcessLogs = async () => {
+    setLoading(true);
+    setDisplay('Fetching /api/simpro/logs/process ...');
+    try {
+      const data = await callAPI("GET",'/logs/process');
+      setDisplay(`Success: ${JSON.stringify(data, null, 2)}`);
+    } catch (err) {
+      setDisplay(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // const handleStoreLogs = async () => {
+  //   setLoading(true);
+  //   setDisplay('Fetching /api/simpro/logs/store ...');
+  //   try {
+  //     const data = await callAPI("GET",'/logs/store');
+  //     setDisplay(`Success: ${JSON.stringify(data, null, 2)}`);
+  //   } catch (err) {
+  //     setDisplay(`Error: ${err.message}`);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }
+
   return (
     <div className="bg-white rounded-xl p-6 border border-gray-200">
       <h2 className="text-xl font-bold mb-4">API Testing</h2>
@@ -204,6 +230,8 @@ const API_Testing = () => {
         <button onClick={handleGetDetailSchedule} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Schedule Detail</button>
         <button onClick={handleGetLog} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Logs</button>
         <button onClick={handleGetSetup} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Setup</button>
+        <button onClick={handleGetProcessLogs} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Process Logs</button>
+        {/* <button onClick={handleStoreLogs} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Store Logs to DB </button> */}
       </div>
 
       {/* Event Tracking View */}

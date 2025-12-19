@@ -506,6 +506,7 @@ export const setupFunction = async (req, res) => {
             const scheduleData = {
                 schedules_id: entry.id,
                 project_id: entry.JobId,
+                cc_id: entry.CostCenterId,
                 worker_id: entry.staffId,
                 status: 'scheduled',
                 schedules_start: combineDateTime(entry.date, entry.startTime),

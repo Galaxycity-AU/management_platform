@@ -1,5 +1,6 @@
 import { prepareLogTableData } from '../utils/dataPreparation.js';
 import { createData, findData } from '../utils/simprohelper.js';
+import db from '../config/database.js';
 
 // In-memory storage for server-side (could be replaced with database or file storage)
 let storedLogs = [];
@@ -709,38 +710,95 @@ function groupLogsByProjectWorkerWorkOrder(logs, debug = false) {
   return result;
 }
 
-async function syncLogs(rawLogs) {
-    // Ensure rawLogs is an array
-    const logsArray = Array.isArray(rawLogs) ? rawLogs : (rawLogs.data || rawLogs.items || []);
+// async function syncLogs(rawLogs) {
+//     // Ensure rawLogs is an array
+//     const logsArray = Array.isArray(rawLogs) ? rawLogs : (rawLogs.data || rawLogs.items || []);
     
-    const currentLastProcessedId = await getLastProcessedIdFromStore();
-    const newLogs = logsArray.filter(l => (l.ID || 0) > currentLastProcessedId);
+//     const currentLastProcessedId = await getLastProcessedIdFromStore();
+//     const newLogs = logsArray.filter(l => (l.ID || 0) > currentLastProcessedId);
   
-    // Store new logs to database
-    if (newLogs.length > 0) {
-        await storeLogToDb(newLogs);
-    }
+//     // Store new logs to database
+//     if (newLogs.length > 0) {
+//         await storeLogToDb(newLogs);
+//     }
   
-    const existingLogs = await getStoredLogs();
-    const mergedLogs = mergeLogs(existingLogs, newLogs);
+//     const existingLogs = await getStoredLogs();
+//     const mergedLogs = mergeLogs(existingLogs, newLogs);
   
-    await saveLogs(mergedLogs);
+//     await saveLogs(mergedLogs);
   
-    // const processedProjects = processLogsByProject(mergedLogs);
-    const processedProjects = groupLogsByProjectWorkerWorkOrder(mergedLogs,true);
-    const tableRows = prepareLogTableData(mergedLogs);
+//     // const processedProjects = processLogsByProject(mergedLogs);
+//     const processedProjects = groupLogsByProjectWorkerWorkOrder(mergedLogs,true);
+//     const tableRows = prepareLogTableData(mergedLogs);
   
-    const allLogIds = mergedLogs.map(l => l.ID || 0).filter(id => id > 0);
-    const highestId = allLogIds.length > 0 ? Math.max(...allLogIds) : currentLastProcessedId;
+//     const allLogIds = mergedLogs.map(l => l.ID || 0).filter(id => id > 0);
+//     const highestId = allLogIds.length > 0 ? Math.max(...allLogIds) : currentLastProcessedId;
   
-    await saveLastProcessedId(highestId);
+//     await saveLastProcessedId(highestId);
   
-    return {
-      logs: mergedLogs,
-      projects: processedProjects,
-      lastProcessedId: highestId,
-      tableRows
-    };
+//     return {
+//       logs: mergedLogs,
+//       projects: processedProjects,
+//       lastProcessedId: highestId,
+//       tableRows
+//     };
+// }
+
+
+async function syncLogs(rawLogs) {
+  try {
+      console.log('=== Starting Log Sync ===');
+      
+      // Ensure rawLogs is an array
+      const logsArray = Array.isArray(rawLogs) ? rawLogs : (rawLogs.data || rawLogs.items || []);
+      console.log(`Received ${logsArray.length} logs from API`);
+      
+      // Get current last processed ID
+      const currentLastProcessedId = await getLastProcessedIdFromStore();
+      console.log(`Last processed ID: ${currentLastProcessedId}`);
+      
+      // Filter to only new logs
+      const newLogs = logsArray.filter(l => (l.ID || 0) > currentLastProcessedId);
+      console.log(`Found ${newLogs.length} new logs to process`);
+      
+      // Store new logs to database
+      let storedCount = 0;
+      let skippedCount = 0;
+      
+      if (newLogs.length > 0) {
+          const storeResult = await storeLogToDb(newLogs);
+          storedCount = storeResult.stored;
+          skippedCount = storeResult.skipped;
+      }
+      
+      // Merge with existing logs in memory
+      const existingLogs = await getStoredLogs();
+      const mergedLogs = mergeLogs(existingLogs, newLogs);
+      await saveLogs(mergedLogs);
+      
+      // Update last processed ID
+      const allLogIds = mergedLogs.map(l => l.ID || 0).filter(id => id > 0);
+      const highestId = allLogIds.length > 0 ? Math.max(...allLogIds) : currentLastProcessedId;
+      await saveLastProcessedId(highestId);
+      
+      console.log('=== Log Sync Complete ===');
+      console.log(`Total logs in memory: ${mergedLogs.length}`);
+      console.log(`New logs stored: ${storedCount}`);
+      console.log(`Logs skipped (duplicates): ${skippedCount}`);
+      console.log(`Last processed ID: ${highestId}`);
+      
+      return {
+          success: true,
+          totalLogs: mergedLogs.length,
+          newLogsStored: storedCount,
+          logsSkipped: skippedCount,
+          lastProcessedId: highestId
+      };
+      
+  } catch (error) {
+      console.error('Error in syncLogs:', error);
+      throw new Error(`Log sync failed: ${error.message}`);
+  }
 }
 
 async function storeLogToDb(logs){
@@ -775,4 +833,92 @@ async function storeLogToDb(logs){
   }
 }
 
-export { syncLogs };
+async function processLogsFromDatabase(){
+  try {
+    console.log('=== Processing Logs from Database ===');
+    
+    // Fetch logs from database
+    const logs = await getLogsFromDatabase();
+    console.log(`Fetched ${logs.length} logs from database`);
+    
+    if (logs.length === 0) {
+        return {
+            projects: [],
+            tableRows: [],
+            totalLogs: 0
+        };
+    }
+    
+    // Group logs and calculate work time
+    const processedProjects = groupLogsByProjectWorkerWorkOrder(logs, true);
+    console.log(`Processed ${processedProjects.length} projects`);
+    
+    // Prepare table data
+    const tableRows = prepareLogTableData(logs);
+    console.log(`Prepared ${tableRows.length} table rows`);
+    
+    console.log('=== Processing Complete ===');
+    
+    return {
+        projects: processedProjects,
+        tableRows: tableRows,
+        totalLogs: logs.length
+    };
+    
+} catch (error) {
+    console.error('Error in processLogsFromDatabase:', error);
+    throw new Error(`Log processing failed: ${error.message}`);
+}
+}
+
+
+async function getLogsFromDatabase(){
+  try {
+    // Build query with JOINs to get related data
+    const queryStr = `
+        SELECT 
+            l.*,
+            w.name as worker_name,
+            p.name as project_name,
+            s.name as status_name,
+            s.color as status_color,
+            s.id as status_id
+        FROM log l
+        LEFT JOIN workers w ON l.staff_id = w.id
+        LEFT JOIN projects p ON l.project_id = p.id
+        LEFT JOIN status s ON l.status_id = s.id
+        ORDER BY l.time ASC
+    `;
+    
+    // Execute query
+    const [rows] = await db.query(queryStr);
+    
+    // Transform database rows to match SimPRO API format
+    const logs = rows.map(row => ({
+        ID: row.id,
+        DateLogged: row.time,
+        Staff: {
+            ID: row.staff_id,
+            Name: row.worker_name
+        },
+        WorkOrder: {
+            ID: row.work_order_id,
+            ProjectID: row.project_id,
+            ProjectName: row.project_name,
+            CostCenterID: row.cc_id
+        },
+        Status: {
+            ID: row.status_id,
+            Name: row.status_name,
+            Code: row.status_id
+        }
+    }));
+    
+    return logs;
+    
+  } catch (error) {
+    throw new Error(`Error fetching logs from database: ${error.message}`);
+  }
+}
+
+export { syncLogs, processLogsFromDatabase };

@@ -10,6 +10,8 @@ router.get('/schedules', simproController.getAllSchedules);
 router.get('/schedules/:id', simproController.getScheduleById);
 router.get('/logs/mobileStatus', simproController.getMobileStatusLog);
 router.get('/setup',simproSetup.setupFunction);
+router.get('/logs/process', simproController.processLogsfromDB);
+// router.get('/logs/store', simproController.storeSimProLogToDb);
 // router.post('simpro/createScheduleWebhook', simproController.createScheduleWebhook);
 // router.get('simpro/projects', simproController.getAllProjects);
 // router.post('simpro/projects', simproController.createProject);

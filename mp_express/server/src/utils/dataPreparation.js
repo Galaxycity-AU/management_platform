@@ -8,19 +8,33 @@ function filterToGet7DaysSchedule(data){
     }
     
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const next7Days = new Date(today);
-    next7Days.setDate(today.getDate() + 20);
-    
-    const filtered = data.filter(item => {
-        if (!item.Date) return false;
-        
-        const itemDate = new Date(item.Date);
-        itemDate.setHours(0, 0, 0, 0);
-        
-        return itemDate >= today && itemDate <= next7Days;
+
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 20);
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 20);
+
+    return data.filter(({ Date: date }) => {
+      if (!date) return false;
+
+      const d = new Date(date);
+      if (Number.isNaN(d.getTime())) return false;
+
+      return d >= start && d <= end;
     });
+    // today.setHours(0, 0, 0, 0);
+    
+    // const previous_7_days = new Date(today);
+    // previous_7_days.setDate(today.getDate() - 10);
+    // const next7Days = new Date(today);
+    // next7Days.setDate(today.getDate() + 20);
+    
+    // const filtered = data.filter(item => {
+    //     if (!item.Date) return false;
+        
+    //     const itemDate = new Date(item.Date);
+    //     itemDate.setHours(0, 0, 0, 0);
+        
+    //     return itemDate >= previous_7_days && itemDate <= next7Days;
+    // });
     
     return filtered;
 }

@@ -57,3 +57,69 @@ export const deleteProject = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Get project note
+export const getProjectNote = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const query = `
+      SELECT 
+        p.id as project_id,
+        p.note,
+        p.note_updated_at,
+        p.note_updated_by,
+        w.name as updated_by_name
+      FROM projects p
+      LEFT JOIN workers w ON p.note_updated_by = w.id
+      WHERE p.id = ?
+    `;
+    const [rows] = await db.query(query, [projectId]);
+    const note = rows[0] || null;
+    res.json({ success: true, note });
+  } catch (error) {
+    console.error('Error fetching note:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Save/Update project note
+export const saveProjectNote = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { content, updatedBy } = req.body;
+    
+    if (content === null || content === undefined) {
+      return res.status(400).json({ success: false, error: 'Content is required' });
+    }
+    
+    const query = `
+      UPDATE projects 
+      SET 
+        note = ?,
+        note_updated_at = CURRENT_TIMESTAMP,
+        note_updated_by = ?
+      WHERE id = ?
+    `;
+    await db.query(query, [content.trim(), updatedBy, projectId]);
+    
+    // Fetch updated note with worker name
+    const fetchQuery = `
+      SELECT 
+        p.id as project_id,
+        p.note,
+        p.note_updated_at,
+        p.note_updated_by,
+        w.name as updated_by_name
+      FROM projects p
+      LEFT JOIN workers w ON p.note_updated_by = w.id
+      WHERE p.id = ?
+    `;
+    const [rows] = await db.query(fetchQuery, [projectId]);
+    const note = rows[0] || null;
+    
+    res.json({ success: true, note });
+  } catch (error) {
+    console.error('Error saving note:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
