@@ -32,11 +32,11 @@ db.getConnection()
     .catch(err => console.error("Database connection error:", err));
 
 // Routes
-app.use('/projects', projectRoutes);
-app.use('/jobs', jobRoutes);
-app.use('/workers', workerRoutes);
-app.use('/approvals', approvalRoutes);
-app.use('/simpro', simproRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/workers', workerRoutes);
+app.use('/api/approvals', approvalRoutes);
+app.use('/api/simpro', simproRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
