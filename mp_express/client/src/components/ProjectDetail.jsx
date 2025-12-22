@@ -365,7 +365,7 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
 
 // --- Main Detail Component ---
 
-export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
+export const ProjectDetail = ({ project, projectData, logs, onBack, onAnalyze }) => {
     const [activeTab, setActiveTab] = useState('LIVE');
     const [currentDate, setCurrentDate] = useState(new Date());
     const [note, setNote] = useState('');
@@ -377,7 +377,7 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
     const [error, setError] = useState(null);
     const textareaRef = React.useRef(null);
 
-    console.log('ProjectDetail Props:', { project, logs });
+    console.log('ProjectDetail Props:', { project, projectData, logs });
 
     // Fetch note when component mounts or project changes
     useEffect(() => {
@@ -634,7 +634,7 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
                     <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between">
                         <span className="text-[10px] md:text-xs text-gray-500 uppercase font-semibold">Project Manager</span>
                         <div className="flex items-end justify-between mt-2">
-                            <span className="text-lg md:text-2xl font-bold text-gray-900">{project.manager}</span>
+                            <span className="text-lg md:text-2xl font-bold text-gray-900">{projectData[0].manager_name}</span>
                             <User className="w-4 h-4 md:w-5 md:h-5 text-gray-300 mb-1" />
                         </div>
                     </div>
@@ -962,9 +962,9 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
 
                         {/* INFO TAB */}
                         {activeTab === 'INFO' && (
-                            <div className="animate-in fade-in duration-300 max-w-2xl">
+                            <div className="animate-in fade-in duration-300">
                                 <h3 className="text-lg font-bold text-gray-900 mb-4">Project Overview</h3>
-                                <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+                                <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6 mb-6">
                                     <div>
                                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Description</label>
                                         <p className="text-gray-700 mt-2 leading-relaxed">{project.description}</p>
@@ -972,19 +972,108 @@ export const ProjectDetail = ({ project, logs, onBack, onAnalyze }) => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
                                             <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Projected Deadline</label>
-                                            <p className="text-gray-900 mt-1 font-medium">{project.deadline.toLocaleDateString()}</p>
+                                            <p className="text-gray-900 mt-1 font-medium">{project.deadline ? (project.deadline instanceof Date ? project.deadline.toLocaleDateString() : new Date(project.deadline).toLocaleDateString()) : 'N/A'}</p>
                                         </div>
                                     </div>
-                                    <div>
-                                        {/* <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Tags</label>
-                                        <div className="flex gap-2 mt-2 flex-wrap">
-                                            {project.tags.map(tag => (
-                                                <span key={tag} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-                                                    {tag}
-                                                </span>
-                                            ))}
-                                        </div> */}
-                                    </div>
+                                </div>
+
+                                {/* Display all data from getProjectById */}
+                                <div className="bg-white rounded-lg border border-gray-200 p-6">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4">All Project Data from API</h3>
+                                    {projectData && Array.isArray(projectData) && projectData.length > 0 ? (
+                                        <div className="space-y-4">
+                                            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                                <p className="text-sm font-semibold text-blue-900">Total Jobs: {projectData.length}</p>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="min-w-full divide-y divide-gray-200">
+                                                    <thead className="bg-gray-50">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job ID</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Worker</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scheduled Start</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Scheduled End</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual Start</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual End</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work Minutes</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Break Minutes</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="bg-white divide-y divide-gray-200">
+                                                        {projectData.map((job, index) => (
+                                                            <tr key={job.job_id || index} className="hover:bg-gray-50">
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{job.job_id}</td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                                    {job.worker_name || 'N/A'} (ID: {job.worker_id || 'N/A'})
+                                                                </td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                                                                        {job.status || 'N/A'}
+                                                                    </span>
+                                                                    {job.status_code && (
+                                                                        <span className="ml-2 text-xs text-gray-500">({job.status_code})</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                                    {job.schedules_start ? new Date(job.schedules_start).toLocaleString() : 'N/A'}
+                                                                </td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                                    {job.schedules_end ? new Date(job.schedules_end).toLocaleString() : 'N/A'}
+                                                                </td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                                    {job.actual_start ? new Date(job.actual_start).toLocaleString() : 'N/A'}
+                                                                </td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                                    {job.actual_end ? new Date(job.actual_end).toLocaleString() : 'N/A'}
+                                                                </td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{job.work_minutes || 'N/A'}</td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{job.break_minutes || 'N/A'}</td>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                                    {job.is_currently_active ? (
+                                                                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Yes</span>
+                                                                    ) : (
+                                                                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">No</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Project Information</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <span className="font-medium text-gray-600">Project Name:</span>
+                                                        <span className="ml-2 text-gray-900">{projectData[0]?.project_name || 'N/A'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-medium text-gray-600">Manager Name:</span>
+                                                        <span className="ml-2 text-gray-900">{projectData[0]?.manager_name || 'N/A'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                                <h4 className="text-sm font-semibold text-yellow-900 mb-2">Raw JSON Data</h4>
+                                                <pre className="text-xs text-yellow-800 overflow-x-auto bg-white p-3 rounded border border-yellow-200">
+                                                    {JSON.stringify(projectData, null, 2)}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    ) : projectData && !Array.isArray(projectData) ? (
+                                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                            <p className="text-sm text-yellow-800 mb-2">Received non-array data:</p>
+                                            <pre className="text-xs text-yellow-800 overflow-x-auto bg-white p-3 rounded border border-yellow-200">
+                                                {JSON.stringify(projectData, null, 2)}
+                                            </pre>
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                            <p className="text-sm text-gray-600">No project data available from API</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

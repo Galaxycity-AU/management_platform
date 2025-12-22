@@ -88,6 +88,13 @@ export async function fetchProjects() {
   return await callDBAPI('/projects');
 }
 
+/**
+ * Fetch project by ID from database
+ */
+export async function fetchProjectById(id) {
+  return await callDBAPI(`/projects/${id}`);
+}
+
 /** Fetch all approvals from database
  */
 export async function fetchApprovals() {

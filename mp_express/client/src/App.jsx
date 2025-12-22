@@ -8,7 +8,7 @@ import ApprovalsPage from './pages/Approvals';
 import API_TestingPage from './pages/API_Testing';
 import { ProjectDetail } from './components/ProjectDetail';
 // import { SimPROProjectDetail } from './components/SimPROProjectDetail';
-import { fetchProjects, fetchJobs, fetchWorkers } from './utils/apiUtils';
+import { fetchProjects, fetchJobs, fetchWorkers, fetchProjectById } from './utils/apiUtils';
 import { LogStatus } from './types';
 function App() {
   const [projects, setProjects] = useState([]);
@@ -189,8 +189,50 @@ function App() {
 function ProjectDetailWrapper({ projects, logs, onAnalyze }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [projectData, setProjectData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Fetch project data from getProjectById API
+  useEffect(() => {
+    const loadProjectData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetchProjectById(id);
+        console.log('Project data from getProjectById:', data);
+        setProjectData(data);
+      } catch (err) {
+        console.error('Error fetching project data:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadProjectData();
+    }
+  }, [id]);
+
+  // Fallback to projects array if API fails
   const project = projects.find(p => String(p.id) === String(id));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg text-gray-600">Loading project data...</div>
+      </div>
+    );
+  }
+
+  if (error && !project) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-lg text-red-600">Error loading project: {error}</div>
+      </div>
+    );
+  }
 
   if (!project) {
     return (
@@ -203,6 +245,7 @@ function ProjectDetailWrapper({ projects, logs, onAnalyze }) {
   return (
     <ProjectDetail
       project={project}
+      projectData={projectData}
       logs={logs.filter(l => String(l.projectId) === String(id))}
       onBack={() => navigate('/projects')}
       onAnalyze={onAnalyze}
@@ -210,29 +253,5 @@ function ProjectDetailWrapper({ projects, logs, onAnalyze }) {
   );
 }
 
-// Wrapper component for SimPROProjectDetail with route params
-// function SimPROProjectDetailWrapper({ projects, logs, onAnalyze }) {
-//   const { id } = useParams();
-//   const navigate = useNavigate();
-
-//   const project = projects.find(p => String(p.id) === String(id));
-
-//   if (!project) {
-//     return (
-//       <div className="flex items-center justify-center h-screen">
-//         <div className="text-lg text-gray-600">Project not found</div>
-//       </div>
-//     );
-//   }
-
-  // return (
-  //   <SimPROProjectDetail
-  //     project={project}
-  //     logs={logs.filter(l => String(l.projectId) === String(id))}
-  //     onBack={() => navigate('/simpro-projects')}
-  //     onAnalyze={onAnalyze}
-  //   />
-  // );
-// }
 
 export default App;

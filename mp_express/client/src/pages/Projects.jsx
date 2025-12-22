@@ -44,6 +44,7 @@ function ProjectsPage() {
                 // Transform jobs to logs
                 const workersMap = new Map(workersData.map((w) => [w.id, w]));
                 const projectsMap = new Map(projectData.map((p) => [Number(p.id), p]));
+                const projectsManagerMap = new Map(projectData.map((p) => [Number(p.manager_id), p]));
 
                 const logsData = jobsData
                     .filter((job) => {
@@ -54,7 +55,7 @@ function ProjectsPage() {
                     .map((job) => {
                         const worker = workersMap.get(job.worker_id);
                         const project = projectsMap.get(job.project_id);
-
+                        const projectManager = projectsManagerMap.get(project.manager_id);
                         const scheduledStart = new Date(job.schedules_start);
                         const scheduledEnd = new Date(job.schedules_end);
                         const actualStart = job.actual_start ? new Date(job.actual_start) : null;
@@ -73,6 +74,7 @@ function ProjectsPage() {
                             role: worker?.position || 'Worker',
                             projectId: String(job.project_id),
                             projectName: project?.name || 'Unknown Project',
+                            projectManager: projectManager?.name || 'Unknown Manager',
                             scheduledStart,
                             scheduledEnd,
                             actualStart,

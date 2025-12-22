@@ -105,7 +105,7 @@ export const DashboardStatsView = ({ stats, projectStatusData, projectAlerts, on
                     </span>
                     <span className="mx-3 text-gray-300">|</span>
                     <span className="text-gray-600 text-sm">
-                      Manager: <span className="font-medium">{alert.manager}</span>
+                      Manager: <span className="font-medium">{alert.projectManager}</span>
                     </span>
                   </div>
                   <div className="mt-1">

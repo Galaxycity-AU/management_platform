@@ -13,8 +13,34 @@ export const getAllProjects = async (req, res) => {
 // Get project by ID
 export const getProjectById = async (req, res) => {
   try {
-    const [projects] = await db.query('SELECT * FROM projects WHERE id = ?', [req.params.id]);
-    res.json(projects[0]);
+    const [projects] = await db.query(`  SELECT
+      j.id AS job_id,
+      j.status,
+      j.status_code,
+      j.schedules_start,
+      j.schedules_end,
+      j.actual_start,
+      j.actual_end,
+      j.work_minutes,
+      j.break_minutes,
+      j.is_currently_active,
+      j.schedule_date,
+
+      w.id AS worker_id,
+      w.name AS worker_name,
+
+      p.name AS project_name,
+      pm.name AS manager_name
+
+    FROM jobs j
+    JOIN projects p ON p.id = j.project_id
+    LEFT JOIN workers w ON w.id = j.worker_id
+    LEFT JOIN workers pm ON pm.id = p.project_manager_id
+    WHERE j.project_id = ?
+    ORDER BY j.schedules_start
+  `, [req.params.id]);
+    res.json(projects);
+    console.log(projects);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
