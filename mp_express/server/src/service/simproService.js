@@ -8,8 +8,17 @@ async function getJob(jobId) {
 }
 
 async function getAllSchedule() {
-    const url = `${BASE_URL}schedules/?orderby=-Date&pageSize=250`;
-    return await callSimproAPI(url, 'GET');
+    const url1 = `${BASE_URL}schedules/?orderby=-Date&pageSize=250`;
+    const url2 = `${BASE_URL}schedules/?orderby=-Date&pageSize=250&page=2`;
+    const result1 = await callSimproAPI(url1, 'GET');
+    const result2 = await callSimproAPI(url2, 'GET');
+    
+    // Extract arrays from results (handle both array and object responses)
+    const array1 = Array.isArray(result1) ? result1 : (result1.results || result1.data || []);
+    const array2 = Array.isArray(result2) ? result2 : (result2.results || result2.data || []);
+    
+    // Merge both arrays
+    return [...array1, ...array2];
 }
 
 async function getDetailSchedule(scheduleId) {

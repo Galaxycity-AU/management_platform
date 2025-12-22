@@ -1,7 +1,7 @@
 import { prepareLogTableData } from '../utils/dataPreparation.js';
 import { createData, findData } from '../utils/simprohelper.js';
 import db from '../config/database.js';
-
+import { updateJobsFromProcessedLogs } from './jobUpdateService.js';
 // In-memory storage for server-side (could be replaced with database or file storage)
 let storedLogs = [];
 let lastProcessedId = 0;
@@ -858,13 +858,12 @@ async function processLogsFromDatabase(){
     console.log(`Prepared ${tableRows.length} table rows`);
     
     console.log('=== Processing Complete ===');
-    
-    return {
-        projects: processedProjects,
-        tableRows: tableRows,
-        totalLogs: logs.length
-    };
-    
+
+    console.log('Updating jobs table from processed logs...');
+    const jobUpdates = await updateJobsFromProcessedLogs(processedProjects);
+    console.log(`Job updates: ${jobUpdates.updated} updated, ${jobUpdates.skipped} skipped, ${jobUpdates.errors} errors`);
+
+
 } catch (error) {
     console.error('Error in processLogsFromDatabase:', error);
     throw new Error(`Log processing failed: ${error.message}`);

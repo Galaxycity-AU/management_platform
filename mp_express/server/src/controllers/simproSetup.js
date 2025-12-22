@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 import { getJob, getAllSchedule, getDetailSchedule, getLog, getEmployee, getSite, getCustomer } from '../service/simproService.js';
 import { filterToGet7DaysSchedule, prepareScheduleTableData, groupScheduleByJobId } from '../utils/dataPreparation.js';
+import { isValid, format } from 'date-fns';
 import { findData, findJob, createData, createProject, createJob, createWorker, createSite, createCustomer, combineDateTime } from '../utils/simprohelper.js';
 // ==database helper functions==
 // const getProjectById = async (req,res) => {
@@ -354,25 +355,25 @@ export const setupFunction = async (req, res) => {
             // ---------- SITE ----------
             let siteDataDB;
 
-            let site = await findData('site', simProJob.Site.ID);
+            const site = await findData('site', simProJob.Site.ID);
+            
             if (!site) {
-            console.log(`✗ Could not find site ${simProJob.Site.ID}`);
-
-            const siteData = await getSite(simProJob.Site.ID);
-            const siteDataDB = {
+              console.log(`✗ Could not find site ${simProJob.Site.ID}`);
+            
+              const siteData = await getSite(simProJob.Site.ID);
+            
+              siteDataDB = {
                 id: siteData.ID,
                 name: siteData.Name,
                 address: siteData.Name,
-            };
-
-            await createSite(siteDataDB);
-            console.log(`✓ Created site ${siteData.ID}`);
-
-
-            siteDataDB = siteDataDB;
+              };
+            
+              await createSite(siteDataDB);
+              console.log(`✓ Created site ${siteData.ID}`);
             } else {
-            siteDataDB = site;
+              siteDataDB = site;
             }
+            
 
             // ---------- CUSTOMER ----------
             let customerId;
@@ -413,24 +414,29 @@ export const setupFunction = async (req, res) => {
             // ---------- PROJECT MANAGER ----------
             let projectManagerId;
 
-            let projectManager = await findData('workers', simProJob.ProjectManager.ID);
-            if (!projectManager) {
-            console.log(`✗ Could not find project manager ${simProJob.ProjectManager.ID}`);
-
-            const pmData = await getEmployee(simProJob.ProjectManager.ID);
-            const pmDataDB = {
-                id: pmData.ID,
-                name: pmData.Name,
-                phone: pmData.PrimaryContact?.CellPhone || null,
-                position: pmData.Position || null,
-            };
-
-            await createWorker(pmDataDB);
-            console.log(`✓ Created project manager ${pmData.ID}`);
-
-            projectManagerId = pmData.ID;
+            if (!simProJob.ProjectManager || !simProJob.ProjectManager.ID) {
+                console.log(`⚠ Job ${simProJob.ID} has no project manager assigned`);
+                projectManagerId = 1; //default project manager id
             } else {
-            projectManagerId = projectManager.id;
+                let projectManager = await findData('workers', simProJob.ProjectManager.ID);
+                if (!projectManager) {
+                console.log(`✗ Could not find project manager ${simProJob.ProjectManager.ID}`);
+
+                const pmData = await getEmployee(simProJob.ProjectManager.ID);
+                const pmDataDB = {
+                    id: pmData.ID,
+                    name: pmData.Name,
+                    phone: pmData.PrimaryContact?.CellPhone || null,
+                    position: pmData.Position || null,
+                };
+
+                await createWorker(pmDataDB);
+                console.log(`✓ Created project manager ${pmData.ID}`);
+
+                projectManagerId = pmData.ID;
+                } else {
+                projectManagerId = projectManager.id;
+                }
             }
 
             //create more worker
@@ -502,6 +508,15 @@ export const setupFunction = async (req, res) => {
                 }
             }
 
+            // const scheduleData = {
+            //     schedules_id: entry.id,
+            //     cc_id: entry.CostCenterId,
+            //     project_id: entry.JobId,
+            //     worker_id: entry.staffId,
+            //     status: 'scheduled',
+            //     schedules_start: combineDateTime(entry.date, entry.startTime),
+            //     schedules_end: combineDateTime(entry.date, entry.endTime),
+            // }
             // Create schedule record
             const scheduleData = {
                 schedules_id: entry.id,
@@ -511,6 +526,7 @@ export const setupFunction = async (req, res) => {
                 status: 'scheduled',
                 schedules_start: combineDateTime(entry.date, entry.startTime),
                 schedules_end: combineDateTime(entry.date, entry.endTime),
+                schedule_date: format(new Date(entry.date), 'yyyy-MM-dd')
                 
                 // Actual time (will be updated from logs)
                 // actual_start: null,
