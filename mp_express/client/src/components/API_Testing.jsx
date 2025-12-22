@@ -191,6 +191,23 @@ const API_Testing = () => {
       setLoading(false);
     }
   }
+  const handleRefreshFlag = async () => {
+    setLoading(true);
+    setDisplay('Fetching /api/flags/refresh ...');
+    try {
+      const data = await fetch(`http://localhost:3001/api/flags/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      setDisplay(`Success: ${JSON.stringify(data, null, 2)}`);
+    } catch (err) {
+      setDisplay(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // const handleStoreLogs = async () => {
   //   setLoading(true);
@@ -231,6 +248,7 @@ const API_Testing = () => {
         <button onClick={handleGetLog} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Logs</button>
         <button onClick={handleGetSetup} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Get Setup</button>
         <button onClick={handleGetProcessLogs} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Process Logs</button>
+        <button onClick={handleRefreshFlag} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Refresh Flag</button>
         {/* <button onClick={handleStoreLogs} disabled={loading} className="px-3 py-2 bg-indigo-600 text-white rounded-lg">Store Logs to DB </button> */}
       </div>
 

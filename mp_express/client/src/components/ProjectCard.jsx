@@ -23,8 +23,8 @@ const WorkerGanttChart = ({ logs }) => {
 
   // Expand range based on actual log data
   logs.forEach(log => {
-    if (log.schedulesStart < minTime) minTime = new Date(log.schedulesStart);
-    if (log.schedulesEnd > maxTime) maxTime = new Date(log.schedulesEnd);
+    if (log.scheduleStart < minTime) minTime = new Date(log.scheduleStart);
+    if (log.scheduleEnd > maxTime) maxTime = new Date(log.scheduleEnd);
     if (log.actualStart && log.actualStart < minTime) minTime = new Date(log.actualStart);
     const endRef = log.actualEnd || new Date();
     if (endRef > maxTime) maxTime = endRef;
@@ -86,12 +86,12 @@ const WorkerGanttChart = ({ logs }) => {
       {/* Workers Rows */}
       <div className="space-y-1">
         {logs.map((log, idx) => {
-          const schedLeft = getPos(log.schedulesStart);
-          const schedWidth = getPos(log.schedulesEnd) - schedLeft;
+          const schedLeft = getPos(log.scheduleStart);
+          const schedWidth = getPos(log.scheduleEnd) - schedLeft;
           
-          const actualStart = log.actualStart || log.schedulesStart;
-          const actualEnd = log.actualEnd || now;
-          const isLive = !log.actualEnd;
+          const actualStart = log.actualStart || log.scheduleStart;
+          const actualEnd = log.actualEnd || log.scheduleEnd;
+          const isLive = !log.actualEnd || !log.scheduleEnd;
           
           const actualLeft = getPos(actualStart);
           const actualWidth = Math.max(2, getPos(actualEnd) - actualLeft);

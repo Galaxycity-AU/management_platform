@@ -519,13 +519,13 @@ export const setupFunction = async (req, res) => {
             // }
             // Create schedule record
             const scheduleData = {
-                schedules_id: entry.id,
+                schedule_id: entry.id,
                 project_id: entry.JobId,
                 cc_id: entry.CostCenterId,
                 worker_id: entry.staffId,
                 status: 'scheduled',
-                schedules_start: combineDateTime(entry.date, entry.startTime),
-                schedules_end: combineDateTime(entry.date, entry.endTime),
+                schedule_start: combineDateTime(entry.date, entry.startTime),
+                schedule_end: combineDateTime(entry.date, entry.endTime),
                 schedule_date: format(new Date(entry.date), 'yyyy-MM-dd')
                 
                 // Actual time (will be updated from logs)

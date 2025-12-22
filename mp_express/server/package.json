@@ -10,9 +10,10 @@
     "seed": "node scripts/seed.mjs"
   },
   "dependencies": {
-    "express": "^5.2.1",
     "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
+    "express": "^5.2.1",
     "mysql2": "^3.15.3"
   },
   "devDependencies": {

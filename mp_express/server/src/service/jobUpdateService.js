@@ -6,6 +6,7 @@
  */
 
 import db from '../config/database.js';
+import { calculateJobFlags } from '../utils/flagCalculator.js';
 
 /**
  * Helper: Get date string in Melbourne timezone (UTC+11)
@@ -47,7 +48,7 @@ export async function updateJobsFromProcessedLogs(processedProjects) {
           // Find matching job using composite key: worker_id + project_id + cc_id + date
           // Match by date only (year-month-day), ignoring time
           const [matchingJobs] = await db.query(`
-            SELECT id, schedules_id, schedules_start, schedules_end, work_order_id
+            SELECT id, schedule_id, schedule_start, schedule_end, work_order_id
             FROM jobs
             WHERE worker_id = ?
               AND project_id = ?
@@ -88,7 +89,9 @@ export async function updateJobsFromProcessedLogs(processedProjects) {
           
           if (matchingJobs.length > 0) {
             // Update existing job
-            const jobId = matchingJobs[0].id;
+            const matchingJob = matchingJobs[0];
+            const jobId = matchingJob.id;
+            
             await db.query(`
               UPDATE jobs 
               SET work_order_id = ?,
@@ -116,6 +119,22 @@ export async function updateJobsFromProcessedLogs(processedProjects) {
               jobData.log_count,
               jobId
             ]);
+            
+            // Recalculate and update flags after job data changes
+            // Use schedule_start/end from matchingJob (already in query result)
+            const jobForFlags = {
+              id: jobId,
+              schedule_start: matchingJob.schedule_start,
+              schedule_end: matchingJob.schedule_end,
+              actual_start: jobData.actual_start,
+              actual_end: jobData.actual_end,
+              status: jobData.status
+            };
+            const flags = calculateJobFlags(jobForFlags);
+            await db.query(
+              `UPDATE jobs SET is_flag = ?, flag_reason = ?, flag_calculated_at = ? WHERE id = ?`,
+              [flags.is_flag, flags.flag_reason, new Date(), jobId]
+            );
             
             updatedCount++;
             console.log(`✓ Updated job ${jobId} - Worker: ${worker.workerName}, WO: ${workOrder.workOrderId || 'N/A'}, Minutes: ${jobData.work_minutes}`);

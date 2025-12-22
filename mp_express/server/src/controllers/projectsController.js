@@ -17,8 +17,8 @@ export const getProjectById = async (req, res) => {
       j.id AS job_id,
       j.status,
       j.status_code,
-      j.schedules_start,
-      j.schedules_end,
+      j.schedule_start,
+      j.schedule_end,
       j.actual_start,
       j.actual_end,
       j.work_minutes,
@@ -37,7 +37,7 @@ export const getProjectById = async (req, res) => {
     LEFT JOIN workers w ON w.id = j.worker_id
     LEFT JOIN workers pm ON pm.id = p.project_manager_id
     WHERE j.project_id = ?
-    ORDER BY j.schedules_start
+    ORDER BY j.schedule_start
   `, [req.params.id]);
     res.json(projects);
     console.log(projects);

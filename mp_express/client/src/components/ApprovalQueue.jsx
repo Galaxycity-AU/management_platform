@@ -9,8 +9,8 @@ import { LogStatus } from '../types';
 // --- Helper Components ---
 
 const TimelineComparison = ({ log }) => {
-  const schedStart = log.schedulesStart;
-  const schedEnd = log.schedulesEnd;
+  const schedStart = log.scheduleStart;
+  const schedEnd = log.scheduleEnd;
 
   // For history, show the FINAL adjusted time as the main "Actual" bar
   const actStart = log.actualStart || schedStart;
@@ -123,8 +123,8 @@ const DraggableTimeline = ({ log, editStartTime, editEndTime, onTimeChange }) =>
   const [initialTimes, setInitialTimes] = useState({ start: null, end: null });
   const timelineRef = React.useRef(null);
 
-  const schedStart = log.schedulesStart;
-  const schedEnd = log.schedulesEnd;
+  const schedStart = log.scheduleStart;
+  const schedEnd = log.scheduleEnd;
 
   // Parse current edit times
   const parseEditTime = (timeStr, baseDate) => {
@@ -340,14 +340,14 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
   const [reason, setReason] = useState("");
 
   // Variance Calc
-  const sDur = log.schedulesEnd.getTime() - log.schedulesStart.getTime();
+  const sDur = log.scheduleEnd.getTime() - log.scheduleStart.getTime();
   const aDur = (log.actualEnd?.getTime() || 0) - (log.actualStart?.getTime() || 0);
   const diffMins = Math.round((aDur - sDur) / 60000);
   const hasDurationVariance = Math.abs(diffMins) > 15; // 15 min buffer
 
   // Timing Check
-  const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.schedulesStart.getTime()) / 60000;
-  const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.schedulesEnd.getTime()) / 60000;
+  const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.scheduleStart.getTime()) / 60000;
+  const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.scheduleEnd.getTime()) / 60000;
   const hasTimingIssue = startDiff > 10 || endDiff > 15;
   
   const hasIssues = hasDurationVariance || hasTimingIssue;
@@ -392,7 +392,7 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
           {/* 3. Variance Stats */}
           <div className="w-40 flex-shrink-0 text-center">
             <div className="text-sm font-mono font-medium text-gray-700">
-              {formatTime(log.schedulesStart)} - {formatTime(log.schedulesEnd)}
+              {formatTime(log.scheduleStart)} - {formatTime(log.scheduleEnd)}
             </div>
             <div className="text-sm font-mono font-medium text-gray-700">
               {log.actualStart?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.actualEnd?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -496,8 +496,8 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <button
                   onClick={() => {
-                    setStartTime(log.schedulesStart.toTimeString().slice(0, 5));
-                    setEndTime(log.schedulesEnd.toTimeString().slice(0, 5));
+                    setStartTime(log.scheduleStart.toTimeString().slice(0, 5));
+                    setEndTime(log.scheduleEnd.toTimeString().slice(0, 5));
                     setReason("Reverted to Schedule");
                   }}
                   className="text-left px-3 py-2 bg-white border border-gray-200 rounded text-xs text-gray-600 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center gap-2"
@@ -553,7 +553,7 @@ const HistoryLogCard = ({ log }) => {
   const isAdjusted = log.editEndTime && log.actualEnd && log.editEndTime.getTime() !== log.actualEnd.getTime();
 
   // Format date
-  const jobDate = log.actualStart || log.schedulesStart;
+  const jobDate = log.actualStart || log.scheduleStart;
   const formattedDate = jobDate ? jobDate.toLocaleDateString('en-US', {
     weekday: 'short',
     year: 'numeric',
@@ -579,7 +579,7 @@ const HistoryLogCard = ({ log }) => {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1 font-medium">
                 <span className="text-gray-500 text-xs">
-                    Sched: {log.schedulesStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.schedulesEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Sched: {log.scheduleStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {log.scheduleEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
               {(isAdjusted || log.editReason) ? (
@@ -671,8 +671,8 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
       const project = projectMap.get(log.projectId);
       project.count++;
 
-      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.schedulesStart.getTime()) / 60000;
-      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.schedulesEnd.getTime()) / 60000;
+      const startDiff = Math.abs((log.actualStart?.getTime() || 0) - log.scheduleStart.getTime()) / 60000;
+      const endDiff = Math.abs((log.actualEnd?.getTime() || 0) - log.scheduleEnd.getTime()) / 60000;
       if (startDiff > 10 || endDiff > 15) {
         project.hasIssues = true;
       }

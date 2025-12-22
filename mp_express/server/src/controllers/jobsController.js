@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { calculateJobFlags } from '../utils/flagCalculator.js';
 
 export const getAllJobs = async (req, res) => {
   try {
@@ -7,6 +8,31 @@ export const getAllJobs = async (req, res) => {
        FROM jobs j 
        LEFT JOIN approvals a ON j.approval_id = a.id`
     );
+    
+    // Refresh stale flags (older than 5 minutes) for time-dependent calculations
+    const now = new Date();
+    const staleThreshold = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
+    
+    const jobsToRefresh = jobs.filter(job => 
+      !job.flag_calculated_at || 
+      new Date(job.flag_calculated_at) < staleThreshold
+    );
+    
+    if (jobsToRefresh.length > 0) {
+      // Batch update stale flags
+      for (const job of jobsToRefresh) {
+        const flags = calculateJobFlags(job, now);
+        await db.query(
+          `UPDATE jobs SET is_flag = ?, flag_reason = ?, flag_calculated_at = ? WHERE id = ?`,
+          [flags.is_flag, flags.flag_reason, now, job.id]
+        );
+        // Update in-memory object for response
+        job.is_flag = flags.is_flag;
+        job.flag_reason = flags.flag_reason;
+        job.flag_calculated_at = now;
+      }
+    }
+    
     res.json(jobs);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -22,6 +48,31 @@ export const getJobsByProject = async (req, res) => {
        WHERE j.project_id = ?`,
       [req.params.projectId]
     );
+    
+    // Refresh stale flags (older than 5 minutes) for time-dependent calculations
+    const now = new Date();
+    const staleThreshold = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
+    
+    const jobsToRefresh = jobs.filter(job => 
+      !job.flag_calculated_at || 
+      new Date(job.flag_calculated_at) < staleThreshold
+    );
+    
+    if (jobsToRefresh.length > 0) {
+      // Batch update stale flags
+      for (const job of jobsToRefresh) {
+        const flags = calculateJobFlags(job, now);
+        await db.query(
+          `UPDATE jobs SET is_flag = ?, flag_reason = ?, flag_calculated_at = ? WHERE id = ?`,
+          [flags.is_flag, flags.flag_reason, now, job.id]
+        );
+        // Update in-memory object for response
+        job.is_flag = flags.is_flag;
+        job.flag_reason = flags.flag_reason;
+        job.flag_calculated_at = now;
+      }
+    }
+    
     res.json(jobs);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -30,12 +81,12 @@ export const getJobsByProject = async (req, res) => {
 
 export const createJob = async (req, res) => {
   try {
-    const { project_id, worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id } = req.body;
+    const { project_id, worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id } = req.body;
     const [result] = await db.query(
-      `INSERT INTO jobs (project_id, worker_id, status, schedules_start, schedules_end, 
+      `INSERT INTO jobs (project_id, worker_id, status, schedule_start, schedule_end, 
        actual_start, actual_end, approval_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [project_id, worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id]
+      [project_id, worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id]
     );
     
     if (status === 'waiting_approval') {
@@ -51,7 +102,22 @@ export const createJob = async (req, res) => {
       );
     }
     
-    res.json({ id: result.insertId, ...req.body });
+    // Calculate and store flags for the new job
+    const newJob = {
+      id: result.insertId,
+      schedule_start,
+      schedule_end,
+      actual_start,
+      actual_end,
+      status
+    };
+    const flags = calculateJobFlags(newJob);
+    await db.query(
+      `UPDATE jobs SET is_flag = ?, flag_reason = ?, flag_calculated_at = ? WHERE id = ?`,
+      [flags.is_flag, flags.flag_reason, new Date(), result.insertId]
+    );
+    
+    res.json({ id: result.insertId, ...req.body, ...flags });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -59,7 +125,7 @@ export const createJob = async (req, res) => {
 
 export const updateJob = async (req, res) => {
   try {
-    const { worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id } = req.body;
+    const { worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id } = req.body;
     const jobId = req.params.id;
     
     const [currentJob] = await db.query('SELECT status, approval_id FROM jobs WHERE id = ?', [jobId]);
@@ -67,10 +133,10 @@ export const updateJob = async (req, res) => {
     const currentApprovalId = currentJob[0]?.approval_id;
     
     await db.query(
-      `UPDATE jobs SET worker_id=?, status=?, schedules_start=?, schedules_end=?, 
+      `UPDATE jobs SET worker_id=?, status=?, schedule_start=?, schedule_end=?, 
        actual_start=?, actual_end=?, approval_id=? 
        WHERE id=?`,
-      [worker_id, status, schedules_start, schedules_end, actual_start, actual_end, approval_id, jobId]
+      [worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id, jobId]
     );
     
     if (status === 'waiting_approval' && currentStatus !== 'waiting_approval' && !currentApprovalId) {
@@ -86,7 +152,22 @@ export const updateJob = async (req, res) => {
       );
     }
     
-    res.json({ success: true });
+    // Recalculate and update flags when job data changes
+    const updatedJob = {
+      id: jobId,
+      schedule_start,
+      schedule_end,
+      actual_start,
+      actual_end,
+      status
+    };
+    const flags = calculateJobFlags(updatedJob);
+    await db.query(
+      `UPDATE jobs SET is_flag = ?, flag_reason = ?, flag_calculated_at = ? WHERE id = ?`,
+      [flags.is_flag, flags.flag_reason, new Date(), jobId]
+    );
+    
+    res.json({ success: true, ...flags });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

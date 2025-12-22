@@ -201,43 +201,19 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                     const avatarColors = ['bg-indigo-500', 'bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500'];
                     const avatarColor = avatarColors[idx % avatarColors.length];
 
-                    // Alert detection logic
-                    const threshold = 10 * 60 * 1000; // 10 minutes
-
-                    // Check if the scheduled start date is today or in the past
-                    const schedStartDate = new Date(log.scheduledStart);
-                    schedStartDate.setHours(0, 0, 0, 0);
-                    const todayDate = new Date(now);
-                    todayDate.setHours(0, 0, 0, 0);
-                    const isScheduledTodayOrPast = schedStartDate <= todayDate;
-
-                    // 1. Shift not started yet but past scheduled start time (overdue to start)
-                    const overdueScheduled = isScheduledTodayOrPast && !log.actualStart &&
-                        (now.getTime() - log.scheduledStart.getTime() > threshold) &&
-                        log.status === LogStatus.SCHEDULE;
-
-                    // 2. Shift started late (actual start is after scheduled start + threshold)
-                    const actualStartLate = log.actualStart != null &&
-                        (log.actualStart.getTime() - log.scheduledStart.getTime() > threshold);
-
-                    // 3. Shift is ACTIVE but exceeded scheduled end time (overtime - this is the key fix)
-                    const overdueEndActive = log.status === LogStatus.ACTIVE &&
-                        !log.actualEnd &&
-                        (now.getTime() - log.scheduledEnd.getTime() > threshold);
-
-                    // 4. Shift ended late (actual end is after scheduled end + threshold)
-                    const actualEndLate = log.actualEnd != null &&
-                        (log.actualEnd.getTime() - log.scheduledEnd.getTime() > threshold);
-
-                    // Show alert for any of these conditions
-                    const showAlert = (log.status === LogStatus.ACTIVE || log.status === LogStatus.SCHEDULE || log.status === LogStatus.WAITING_APPROVAL) && (overdueScheduled || actualStartLate || overdueEndActive || actualEndLate);
+                    // Use stored flag from database (calculated on backend)
+                    // Don't show alert for approved or rejected jobs
+                    // Handle both boolean true, numeric 1, and string '1' from database
+                    const isFlagged = log.is_flag === true || log.is_flag === 1 || log.is_flag === '1';
+                    const showAlert = (log.status === LogStatus.ACTIVE || log.status === LogStatus.SCHEDULE || log.status === LogStatus.WAITING_APPROVAL) && 
+                                     isFlagged && 
+                                     log.flag_reason !== null;
 
                     console.log('Log Alert Check:', log.workerName, {
-                        isScheduledTodayOrPast,
-                        overdueScheduled,
-                        actualStartLate,
-                        overdueEndActive,
-                        actualEndLate,
+                        jobId: log.id,
+                        is_flag: log.is_flag,
+                        flag_reason: log.flag_reason,
+                        status: log.status,
                         showAlert,
                         isLive,
                         scheduledEnd: log.scheduledEnd,
@@ -318,9 +294,12 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                             <div className="w-32 flex-shrink-0 flex flex-col justify-center text-right px-3 py-3 border-l border-gray-100 bg-white">
                                 <div className={`text-sm font-semibold ${statusColor} mb-0.5`}>
                                     {showAlert ? (
-                                        <TriangleAlert className="w-4 h-4 inline-block mr-1 align-middle" style={{ color: 'red' }} />
+                                        <span className="flex items-center justify-end gap-1" title={log.flag_reason || ''}>
+                                            <TriangleAlert className="w-4 h-4 inline-block align-middle" style={{ color: 'red' }} />
+                                            <span className="text-[10px] text-red-600 font-medium">{log.flag_reason}</span>
+                                        </span>
                                     ) : null}
-                                    {statusText}
+                                    {!showAlert && statusText}
                                 </div>
                                 <div className="text-[11px] text-gray-500">
                                     {timeText}
@@ -1017,10 +996,10 @@ export const ProjectDetail = ({ project, projectData, logs, onBack, onAnalyze })
                                                                     )}
                                                                 </td>
                                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                                                    {job.schedules_start ? new Date(job.schedules_start).toLocaleString() : 'N/A'}
+                                                                    {job.schedule_start ? new Date(job.schedule_start).toLocaleString() : 'N/A'}
                                                                 </td>
                                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
-                                                                    {job.schedules_end ? new Date(job.schedules_end).toLocaleString() : 'N/A'}
+                                                                    {job.schedule_end ? new Date(job.schedule_end).toLocaleString() : 'N/A'}
                                                                 </td>
                                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                                                                     {job.actual_start ? new Date(job.actual_start).toLocaleString() : 'N/A'}

@@ -16,7 +16,7 @@ async function findData(table, id) {
 
 async function findJob(id){
     try {
-        const [rows] = await db.query(`SELECT * FROM jobs WHERE schedules_id = ?`, [id]);
+        const [rows] = await db.query(`SELECT * FROM jobs WHERE schedule_id = ?`, [id]);
         return rows[0] || null;
     } catch (error) {
         throw new Error(`Error finding job: ${error.message}`);

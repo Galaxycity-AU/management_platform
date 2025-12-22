@@ -48,7 +48,7 @@ function ProjectsPage() {
 
                 const logsData = jobsData
                     .filter((job) => {
-                        const startTime = job.actual_start || job.modified_start || job.schedules_start;
+                        const startTime = job.actual_start || job.modified_start || job.schedule_start;
                         const endTime = job.actual_end || job.modified_end || job.schedules_end;
                         return startTime && endTime;
                     })
@@ -85,7 +85,10 @@ function ProjectsPage() {
                             notes: `Job #${job.id}`,
                             adjustmentReason: job.modified_start ? 'Job rescheduled' : undefined,
                             approvedAt: actualEnd || undefined,
-                            approvedBy: actualEnd ? 'System' : undefined
+                            approvedBy: actualEnd ? 'System' : undefined,
+                            // Include flag fields from database
+                            is_flag: job.is_flag || false,
+                            flag_reason: job.flag_reason || null
                         };
                     });
 

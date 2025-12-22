@@ -7,6 +7,7 @@ import jobRoutes from './routes/jobs.js';
 import workerRoutes from './routes/workers.js';
 import approvalRoutes from './routes/approvals.js';
 import simproRoutes from './routes/simpro.js';
+import flagRoutes from './routes/flags.js';
 import dotenv from 'dotenv';
 
 // Middleware imports
@@ -37,6 +38,7 @@ app.use('/api/jobs', jobRoutes);
 app.use('/api/workers', workerRoutes);
 app.use('/api/approvals', approvalRoutes);
 app.use('/api/simpro', simproRoutes);
+app.use('/api/flags', flagRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

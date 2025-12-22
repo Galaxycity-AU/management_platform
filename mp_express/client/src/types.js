@@ -33,9 +33,9 @@ export const LogStatus = {
  * @property {number} [spent] - Amount spent on project
  * @property {number} [budget] - Project budget
  * @property {number} [progress] - Project progress percentage (0-100)
- * @property {Date} [scheduledStart] - Scheduled start date (for SimPRO projects)
- * @property {Date} [scheduledEnd] - Scheduled end date (for SimPRO projects)
- * @property {Array} [schedules] - Schedule array (for SimPRO projects)
+ * @property {Date} [scheduleStart] - Scheduled start date (for SimPRO projects)
+ * @property {Date} [scheduleEnd] - Scheduled end date (for SimPRO projects)
+ * @property {Array} [schedule] - Schedule array (for SimPRO projects)
  */
 
 /**
@@ -46,8 +46,8 @@ export const LogStatus = {
  * @property {string} role - Worker's role/position
  * @property {string} projectId - Associated project ID
  * @property {string} projectName - Associated project name
- * @property {Date} scheduledStart - Scheduled start time
- * @property {Date} scheduledEnd - Scheduled end time
+ * @property {Date} scheduleStart - Scheduled start time
+ * @property {Date} scheduleEnd - Scheduled end time
  * @property {Date|null} actualStart - Actual start time
  * @property {Date|null} actualEnd - Actual end time
  * @property {Date|null} [originalActualStart] - Original actual start time before adjustment
