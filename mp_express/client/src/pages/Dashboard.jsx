@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardStatsView } from '../components/DashboardStats';
 import CentraliseView from '../components/CentraliseView';
 import { ProjectStatus, LogStatus } from '../types';
 import { loadProjectsAndLogs } from '../utils/dataLoader';
+import { useDashboardSocket } from '../hooks/useSocket';
 
 function DashboardPage() {
   const [projects, setProjects] = useState([]);
@@ -10,57 +11,89 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [flagMap, setFlagMap] = useState({});
 
-  // Load data using centralized loader
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        
-        const { projects: projectData, logs: logsData } = await loadProjectsAndLogs();
-
-        setProjects(projectData);
-        setLogs(logsData);
-
-        // Fetch dashboard alerts
-        try {
-          const response = await fetch('/api/jobs/dashboard/alerts');
-          if (response.ok) {
-            const alertsData = await response.json();
-            // Convert alerts array to a map keyed by project ID
-            // Handle both string and number IDs for matching
-            const flagMapObj = {};
-            if (alertsData.alerts && Array.isArray(alertsData.alerts)) {
-              alertsData.alerts.forEach(alert => {
-                // Use both string and number keys to handle ID type mismatches
-                const id = alert.id;
-                flagMapObj[id] = alert;
-                flagMapObj[String(id)] = alert;
-                flagMapObj[Number(id)] = alert;
-              });
-            }
-            console.log('📊 Flag map loaded:', Object.keys(flagMapObj).length, 'projects');
-            setFlagMap(flagMapObj);
-          } else {
-            console.error('Failed to fetch dashboard alerts:', response.statusText);
-            setFlagMap({});
-          }
-        } catch (alertError) {
-          console.error('Error fetching dashboard alerts:', alertError);
-          setFlagMap({});
+  // Function to fetch dashboard alerts
+  const fetchDashboardAlerts = useCallback(async () => {
+    try {
+      const response = await fetch('/api/jobs/dashboard/alerts');
+      if (response.ok) {
+        const alertsData = await response.json();
+        // Convert alerts array to a map keyed by project ID
+        // Handle both string and number IDs for matching
+        const flagMapObj = {};
+        if (alertsData.alerts && Array.isArray(alertsData.alerts)) {
+          alertsData.alerts.forEach(alert => {
+            // Use both string and number keys to handle ID type mismatches
+            const id = alert.id;
+            flagMapObj[id] = alert;
+            flagMapObj[String(id)] = alert;
+            flagMapObj[Number(id)] = alert;
+          });
         }
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-        setProjects([]);
-        setLogs([]);
+        console.log('[Dashboard] Flag map loaded:', Object.keys(flagMapObj).length, 'projects');
+        setFlagMap(flagMapObj);
+      } else {
+        console.error('Failed to fetch dashboard alerts:', response.statusText);
         setFlagMap({});
-      } finally {
-        setLoading(false);
       }
-    };
-
-    loadData();
-
+    } catch (alertError) {
+      console.error('Error fetching dashboard alerts:', alertError);
+      setFlagMap({});
+    }
   }, []);
+
+  // Function to load all data
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      const { projects: projectData, logs: logsData } = await loadProjectsAndLogs();
+
+      setProjects(projectData);
+      setLogs(logsData);
+
+      // Fetch dashboard alerts
+      await fetchDashboardAlerts();
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      setProjects([]);
+      setLogs([]);
+      setFlagMap({});
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchDashboardAlerts]);
+
+  // Socket event handlers
+  const handleAlertsUpdate = useCallback((data) => {
+    console.log('[Dashboard] Received real-time alerts update:', data);
+    if (data.alerts && Array.isArray(data.alerts)) {
+      const flagMapObj = {};
+      data.alerts.forEach(alert => {
+        const id = alert.id;
+        flagMapObj[id] = alert;
+        flagMapObj[String(id)] = alert;
+        flagMapObj[Number(id)] = alert;
+      });
+      setFlagMap(flagMapObj);
+    }
+  }, []);
+
+  const handleStatsUpdate = useCallback((data) => {
+    console.log('[Dashboard] Received real-time stats update:', data);
+    // Refresh data when stats update is received
+    loadData();
+  }, [loadData]);
+
+  // Set up socket listeners for real-time updates
+  const { isConnected } = useDashboardSocket({
+    onAlertsUpdate: handleAlertsUpdate,
+    onStatsUpdate: handleStatsUpdate,
+  });
+
+  // Initial data load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Stats Calculation
   const stats = {
@@ -78,10 +111,8 @@ function DashboardPage() {
   ];
 
   const projectAlerts = React.useMemo(() => {
-    console.log('🔄 Calculating project alerts with flagged jobs...');
-    console.log(`📊 Processing ${projects.length} projects`);
-    console.log('🔍 Flag map keys:', Object.keys(flagMap));
-    console.log('🔍 Project IDs:', projects.map(p => `${p.id} (${typeof p.id})`));
+    console.log('[Dashboard] Calculating project alerts with flagged jobs...');
+    console.log(`[Dashboard] Processing ${projects.length} projects`);
 
     // Build project alerts with flags
     const alerts = projects.map(p => {
@@ -96,13 +127,8 @@ function DashboardPage() {
         flaggedJobDetails: []
       };
 
-
       // A project has alerts if it has flagged jobs
       const hasAlerts = projectFlags.flaggedJobs > 0;
-
-      if (projectFlags.flaggedJobs > 0) {
-        console.log(`🚨 Project ${p.id} (${p.name}):`, projectFlags);
-      }
 
       return {
         ...p,
@@ -127,17 +153,7 @@ function DashboardPage() {
     });
 
     const totalFlaggedJobs = sortedAlerts.reduce((sum, p) => sum + (p.flaggedJobs || 0), 0);
-    console.log(`✅ Found ${sortedAlerts.length} projects with alerts`);
-    console.log(`🚨 Total flagged jobs: ${totalFlaggedJobs}`);
-    
-    // Log top 3 projects for debugging
-    sortedAlerts.slice(0, 3).forEach((alert, idx) => {
-      console.log(`#${idx + 1}: ${alert.name} - ${alert.flaggedJobs} flagged jobs`, {
-        notStarted: alert.flagBreakdown.notStartedOnTime,
-        startedLate: alert.flagBreakdown.startedLate,
-        notEnded: alert.flagBreakdown.notEndedOnTime
-      });
-    });
+    console.log(`[Dashboard] Found ${sortedAlerts.length} projects with alerts, ${totalFlaggedJobs} total flagged jobs`);
 
     return sortedAlerts;
   }, [projects, logs, flagMap]);
@@ -158,6 +174,13 @@ function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Connection status indicator (optional - can be removed in production) */}
+      {!isConnected && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-2 rounded-lg text-sm">
+          Real-time updates disconnected. Data may not be current.
+        </div>
+      )}
+      
       {/* Dashboard Stats Section */}
       <DashboardStatsView 
         stats={stats} 

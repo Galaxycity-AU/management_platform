@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { toMySQLDateTime } from '../utils/helpers.js';
 
 // Get all projects
 export const getAllProjects = async (req, res) => {
@@ -50,9 +51,10 @@ export const getProjectById = async (req, res) => {
 export const createProject = async (req, res) => {
   try {
     const { name, description, deadline, status, client, manager } = req.body;
+    const mysqlDeadline = toMySQLDateTime(deadline);
     const [result] = await db.query(
       'INSERT INTO projects (name, description, deadline, status, client, manager) VALUES (?, ?, ?, ?, ?, ?)',
-      [name, description, deadline, status, client, manager]
+      [name, description, mysqlDeadline, status, client, manager]
     );
     res.json({ id: result.insertId, name, description, deadline, status, client, manager });
   } catch (error) {
@@ -64,9 +66,10 @@ export const createProject = async (req, res) => {
 export const updateProject = async (req, res) => {
   try {
     const { name, description, deadline, status, client, manager } = req.body;
+    const mysqlDeadline = toMySQLDateTime(deadline);
     await db.query(
       'UPDATE projects SET name=?, description=?, deadline=?, status=?, client=?, manager=? WHERE id=?',
-      [name, description, deadline, status, client, manager, req.params.id]
+      [name, description, mysqlDeadline, status, client, manager, req.params.id]
     );
     res.json({ success: true });
   } catch (error) {

@@ -1,5 +1,7 @@
 import db from '../config/database.js';
 import { calculateJobFlags } from '../utils/flagCalculator.js';
+import { emitJobCreated, emitJobUpdated, emitJobDeleted, emitDashboardAlerts, emitStatsUpdated } from '../socket/eventEmitter.js';
+import { toMySQLDateTime } from '../utils/helpers.js';
 
 export const getAllJobs = async (req, res) => {
   try {
@@ -82,11 +84,18 @@ export const getJobsByProject = async (req, res) => {
 export const createJob = async (req, res) => {
   try {
     const { project_id, worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id } = req.body;
+    
+    // Convert ISO datetime strings to MySQL format
+    const mysqlScheduleStart = toMySQLDateTime(schedule_start);
+    const mysqlScheduleEnd = toMySQLDateTime(schedule_end);
+    const mysqlActualStart = toMySQLDateTime(actual_start);
+    const mysqlActualEnd = toMySQLDateTime(actual_end);
+    
     const [result] = await db.query(
       `INSERT INTO jobs (project_id, worker_id, status, schedule_start, schedule_end, 
        actual_start, actual_end, approval_id) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [project_id, worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id]
+      [project_id, worker_id, status, mysqlScheduleStart, mysqlScheduleEnd, mysqlActualStart, mysqlActualEnd, approval_id]
     );
     
     if (status === 'waiting_approval') {
@@ -105,6 +114,8 @@ export const createJob = async (req, res) => {
     // Calculate and store flags for the new job
     const newJob = {
       id: result.insertId,
+      project_id,
+      worker_id,
       schedule_start,
       schedule_end,
       actual_start,
@@ -117,7 +128,15 @@ export const createJob = async (req, res) => {
       [flags.is_flag, flags.flag_reason, new Date(), result.insertId]
     );
     
-    res.json({ id: result.insertId, ...req.body, ...flags });
+    const createdJob = { id: result.insertId, ...req.body, ...flags };
+    
+    // Emit socket event for job creation
+    emitJobCreated(createdJob);
+    
+    // Also emit stats update to refresh dashboard
+    emitStatsUpdated({ jobCreated: true, jobId: result.insertId });
+    
+    res.json(createdJob);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -128,15 +147,22 @@ export const updateJob = async (req, res) => {
     const { worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id } = req.body;
     const jobId = req.params.id;
     
-    const [currentJob] = await db.query('SELECT status, approval_id FROM jobs WHERE id = ?', [jobId]);
+    const [currentJob] = await db.query('SELECT * FROM jobs WHERE id = ?', [jobId]);
     const currentStatus = currentJob[0]?.status;
     const currentApprovalId = currentJob[0]?.approval_id;
+    const projectId = currentJob[0]?.project_id;
+    
+    // Convert ISO datetime strings to MySQL format
+    const mysqlScheduleStart = toMySQLDateTime(schedule_start);
+    const mysqlScheduleEnd = toMySQLDateTime(schedule_end);
+    const mysqlActualStart = toMySQLDateTime(actual_start);
+    const mysqlActualEnd = toMySQLDateTime(actual_end);
     
     await db.query(
       `UPDATE jobs SET worker_id=?, status=?, schedule_start=?, schedule_end=?, 
        actual_start=?, actual_end=?, approval_id=? 
        WHERE id=?`,
-      [worker_id, status, schedule_start, schedule_end, actual_start, actual_end, approval_id, jobId]
+      [worker_id, status, mysqlScheduleStart, mysqlScheduleEnd, mysqlActualStart, mysqlActualEnd, approval_id, jobId]
     );
     
     if (status === 'waiting_approval' && currentStatus !== 'waiting_approval' && !currentApprovalId) {
@@ -155,6 +181,8 @@ export const updateJob = async (req, res) => {
     // Recalculate and update flags when job data changes
     const updatedJob = {
       id: jobId,
+      project_id: projectId,
+      worker_id,
       schedule_start,
       schedule_end,
       actual_start,
@@ -167,6 +195,14 @@ export const updateJob = async (req, res) => {
       [flags.is_flag, flags.flag_reason, new Date(), jobId]
     );
     
+    // Emit socket event for job update
+    emitJobUpdated({ ...updatedJob, ...flags });
+    
+    // If status changed, emit stats update
+    if (currentStatus !== status) {
+      emitStatsUpdated({ jobUpdated: true, jobId, oldStatus: currentStatus, newStatus: status });
+    }
+    
     res.json({ success: true, ...flags });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -175,7 +211,20 @@ export const updateJob = async (req, res) => {
 
 export const deleteJob = async (req, res) => {
   try {
-    await db.query('DELETE FROM jobs WHERE id=?', [req.params.id]);
+    const jobId = req.params.id;
+    
+    // Get project_id before deletion for socket event
+    const [job] = await db.query('SELECT project_id FROM jobs WHERE id = ?', [jobId]);
+    const projectId = job[0]?.project_id;
+    
+    await db.query('DELETE FROM jobs WHERE id=?', [jobId]);
+    
+    // Emit socket event for job deletion
+    emitJobDeleted(jobId, projectId);
+    
+    // Emit stats update
+    emitStatsUpdated({ jobDeleted: true, jobId });
+    
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -270,12 +319,17 @@ export const getDashboardAlerts = async (req, res) => {
       }
     };
 
-    res.json({
+    const responseData = {
       success: true,
       alerts: formattedAlerts,
       summary,
       timestamp: new Date().toISOString()
-    });
+    };
+
+    // Emit socket event for dashboard alerts
+    emitDashboardAlerts(responseData);
+
+    res.json(responseData);
 
   } catch (error) {
     res.status(500).json({

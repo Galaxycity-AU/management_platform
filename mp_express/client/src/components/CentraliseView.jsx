@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Clock, TriangleAlert } from 'lucide-react';
 import { fetchWorkers, fetchJobs, fetchProjects } from '../utils/apiUtils';
 import { useNavigate } from 'react-router-dom';
+import { useJobSocket } from '../hooks/useSocket';
 
 const CentraliseView = () => {
   const [blockHeight] = useState(1);
@@ -11,6 +12,8 @@ const CentraliseView = () => {
   const [showAll, setShowAll] = useState(false);
   const [resources, setResources] = useState([]);
   const [scheduledJobs, setScheduledJobs] = useState([]);
+  const dateStripScrollRef = useRef(null);
+  const todayButtonRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const resourceListScrollRef = useRef(null);
@@ -185,11 +188,56 @@ const CentraliseView = () => {
     }
   }, []);
 
+  // Socket event handlers for real-time updates
+  const handleJobCreated = useCallback((data) => {
+    console.log('[CentraliseView] Received real-time job created:', data);
+    loadData();
+  }, [loadData]);
+
+  const handleJobUpdated = useCallback((data) => {
+    console.log('[CentraliseView] Received real-time job updated:', data);
+    loadData();
+  }, [loadData]);
+
+  const handleJobDeleted = useCallback((data) => {
+    console.log('[CentraliseView] Received real-time job deleted:', data);
+    loadData();
+  }, [loadData]);
+
+  // Set up socket listeners for real-time job updates
+  useJobSocket({
+    onJobCreated: handleJobCreated,
+    onJobUpdated: handleJobUpdated,
+    onJobDeleted: handleJobDeleted,
+  });
+
   // Fetch data from database on mount
   useEffect(() => {
     loadData();
   }, [loadData]);
 
+
+  const centerToday = useCallback((smooth = true) => {
+    const container = dateStripScrollRef.current;
+    const todayBtn = todayButtonRef.current;
+    if (container && todayBtn) {
+      const containerWidth = container.clientWidth;
+      const btnWidth = todayBtn.clientWidth;
+      const btnLeft = todayBtn.offsetLeft;
+      const scrollPos = btnLeft - (containerWidth / 2) + (btnWidth / 2);
+      container.scrollTo({ 
+        left: scrollPos, 
+        behavior: smooth ? 'smooth' : 'auto' 
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && resources.length > 0) {
+      const timer = setTimeout(() => centerToday(true), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, currentMonth, resources.length, centerToday]);
 
 
   const generateDates = () => {
@@ -636,30 +684,26 @@ const CentraliseView = () => {
           }
         `}</style>
         <div 
-          className="date-scroll-container overflow-x-auto"
-          style={{ 
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#cbd5e0 #f7fafc'
-          }}
+          ref={dateStripScrollRef}
+          className="flex bg-white border-b border-slate-200 overflow-x-auto no-scrollbar scroll-smooth"
         >
-          <div className="flex">
-            {dates.map((date, index) => (
-              <button
-                key={index}
-                onClick={() => handleDateClick(date)}
-                className={`flex-shrink-0 w-16 text-center py-2 border-r border-gray-200 transition select-none hover:bg-gray-100 ${
-                  isSelectedDate(date)
-                    ? 'bg-blue-500 text-white hover:bg-blue-600'
-                    : isToday(date)
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'bg-white'
-                }`}
-              >
-                <div className="text-xs font-medium">{getDayName(date)}</div>
-                <div className="text-xl font-semibold">{getDateNumber(date)}</div>
-              </button>
-            ))}
-          </div>
+          {dates.map((date, index) => (
+            <button
+              key={index}
+              ref={isToday(date) ? todayButtonRef : null}
+              onClick={() => handleDateClick(date)}
+              className={`flex-shrink-0 w-16 py-4 border-r border-slate-100 transition-all ${
+                isSelectedDate(date)
+                  ? 'bg-blue-600 text-white shadow-inner'
+                  : isToday(date)
+                  ? 'bg-blue-50 text-blue-600 font-bold'
+                  : 'bg-white text-slate-500'
+              }`}
+            >
+              <div className="text-[10px] font-black uppercase opacity-60 mb-1">{date.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+              <div className="text-xl font-black">{date.getDate()}</div>
+            </button>
+          ))}
         </div>
       </div>
 

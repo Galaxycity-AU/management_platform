@@ -501,19 +501,21 @@ export const ProjectDetail = ({ project, projectData, logs, onBack, onAnalyze })
         schedStart.setHours(0, 0, 0, 0);
         const viewDate = new Date(currentDate);
         viewDate.setHours(0, 0, 0, 0);
-
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+    
         // Include if scheduled start is on the selected date
         const startsOnDate = schedStart.getTime() === viewDate.getTime();
-
+    
         // Include if it's an ongoing shift that started before and hasn't ended yet.
-        // Don't rely on status, because status can be stale while actualStart/actualEnd are accurate.
+        // IMPORTANT: Only show ongoing shifts up to TODAY, not on future dates
         const isOngoingFromBefore = Boolean(l.actualStart) &&
             !l.actualEnd &&
-            schedStart < viewDate;
-
+            schedStart < viewDate &&
+            viewDate <= today; // ← KEY FIX: Don't show active jobs on future dates
+    
         return startsOnDate || isOngoingFromBefore;
     });
-
     // Calculate staffing summary for the SELECTED date (not just today)
     const scheduled = displayLogs.length;
     const started = displayLogs.filter(l => l.actualStart).length;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import { SocketProvider } from './context/SocketContext';
 import DashboardPage from './pages/Dashboard';
 import ProjectsPage from './pages/Projects';
 import ApprovalsPage from './pages/Approvals';
@@ -50,26 +51,28 @@ function App() {
   };
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/projects" element={<ProjectsPage />} />
-        <Route 
-          path="/projects/:id" 
-          element={
-            <ProjectDetailWrapper 
-              projects={projects} 
-              logs={logs} 
-              onAnalyze={handleAnalyzeProject}
-            />
-          } 
-        />
-        <Route path="/approvals" element={<ApprovalsPage />} />
-        <Route path="/api-testing" element={<API_TestingPage />} />
+    <SocketProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
+          <Route 
+            path="/projects/:id" 
+            element={
+              <ProjectDetailWrapper 
+                projects={projects} 
+                logs={logs} 
+                onAnalyze={handleAnalyzeProject}
+              />
+            } 
+          />
+          <Route path="/approvals" element={<ApprovalsPage />} />
+          <Route path="/api-testing" element={<API_TestingPage />} />
 
-      </Routes>
-    </Layout>
+        </Routes>
+      </Layout>
+    </SocketProvider>
   );
 }
 
