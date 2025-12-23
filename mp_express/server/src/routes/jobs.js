@@ -9,4 +9,6 @@ router.post('/', controller.createJob);
 router.put('/:id', controller.updateJob);
 router.delete('/:id', controller.deleteJob);
 
+router.get('/dashboard/alerts', controller.getDashboardAlerts);
+
 export default router;

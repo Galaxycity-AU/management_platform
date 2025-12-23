@@ -40,7 +40,7 @@ export const getProjectById = async (req, res) => {
     ORDER BY j.schedule_start
   `, [req.params.id]);
     res.json(projects);
-    console.log(projects);
+    // console.log(projects);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

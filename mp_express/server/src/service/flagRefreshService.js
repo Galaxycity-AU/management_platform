@@ -14,7 +14,7 @@ import { calculateJobFlags } from '../utils/flagCalculator.js';
  * @param {number} staleMinutes - Consider flags stale if older than this many minutes (default: 5)
  * @returns {Object} Summary of refresh operation
  */
-export async function refreshJobFlags(staleMinutes = 5) {
+export async function refreshJobFlags(staleMinutes = 10) {
   try {
     const now = new Date();
     const staleThreshold = new Date(now.getTime() - staleMinutes * 60 * 1000);

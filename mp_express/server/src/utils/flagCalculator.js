@@ -144,7 +144,7 @@
  */
 
 const THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes in milliseconds
-const DEBUG = true; // Set to false to disable debug logs
+const DEBUG = false; // Set to false to disable debug logs
 
 /**
  * Debug logger
@@ -200,13 +200,13 @@ export function calculateJobFlags(job, now = new Date()) {
   const actualEnd = actual_end ? new Date(actual_end) : null;
   const currentTime = new Date(now);
 
-  log(jobId, 'Parsed dates', {
-    scheduledStart: scheduledStart.toISOString(),
-    scheduledEnd: scheduledEnd?.toISOString() || 'N/A',
-    actualStart: actualStart?.toISOString() || 'N/A',
-    actualEnd: actualEnd?.toISOString() || 'N/A',
-    currentTime: currentTime.toISOString()
-  });
+  // log(jobId, 'Parsed dates', {
+  //   scheduledStart: scheduledStart.toISOString(),
+  //   scheduledEnd: scheduledEnd?.toISOString() || 'N/A',
+  //   actualStart: actualStart?.toISOString() || 'N/A',
+  //   actualEnd: actualEnd?.toISOString() || 'N/A',
+  //   currentTime: currentTime.toISOString()
+  // });
 
   // Calculate time differences
   const timeFromScheduledStart = currentTime.getTime() - scheduledStart.getTime();

@@ -248,16 +248,16 @@ const CentraliseView = () => {
     const reason = isFlagged ? job.flag_reason : null;
     
     // Debug logging
-    if (job.is_flag !== undefined && job.is_flag !== false && job.is_flag !== 0 && job.is_flag !== '0') {
-      console.log('CentraliseView - Job flag check:', {
-        jobId: job.id,
-        is_flag: job.is_flag,
-        flag_reason: job.flag_reason,
-        isFlagged,
-        reason,
-        status: job.status
-      });
-    }
+    // if (job.is_flag !== undefined && job.is_flag !== false && job.is_flag !== 0 && job.is_flag !== '0') {
+    //   console.log('CentraliseView - Job flag check:', {
+    //     jobId: job.id,
+    //     is_flag: job.is_flag,
+    //     flag_reason: job.flag_reason,
+    //     isFlagged,
+    //     reason,
+    //     status: job.status
+    //   });
+    // }
     
     return reason;
   };

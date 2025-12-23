@@ -2,102 +2,64 @@ import React, { useState, useEffect } from 'react';
 import { DashboardStatsView } from '../components/DashboardStats';
 import CentraliseView from '../components/CentraliseView';
 import { ProjectStatus, LogStatus } from '../types';
-import { fetchProjects, fetchJobs, fetchWorkers } from '../utils/apiUtils';
+import { loadProjectsAndLogs } from '../utils/dataLoader';
 
 function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [flagMap, setFlagMap] = useState({});
 
-  // Load data
+  // Load data using centralized loader
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [projectsData, jobsData, workersData] = await Promise.all([
-          fetchProjects(),
-          fetchJobs(),
-          fetchWorkers()
-        ]);
-
-        // Transform projects
-        const toSafeDate = (d) => {
-          if (d == null) return null;
-          if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
-          const parsed = new Date(d);
-          return isNaN(parsed.getTime()) ? null : parsed;
-        };
-
-        const projectData = projectsData.map((p) => ({
-          ...p,
-          deadline: toSafeDate(p.deadline),
-          spent: p.spent || 0,
-          budget: p.budget || 0,
-          progress: p.progress || 0,
-        }));
+        
+        const { projects: projectData, logs: logsData } = await loadProjectsAndLogs();
 
         setProjects(projectData);
-
-        // Transform jobs to logs
-        const workersMap = new Map(workersData.map((w) => [w.id, w]));
-        const projectsMap = new Map(projectData.map((p) => [Number(p.id), p]));
-
-        const logsData = jobsData
-          .filter((job) => {
-            const startTime = job.actual_start || job.modified_start || job.schedule_start;
-            const endTime = job.actual_end || job.modified_end || job.schedule_end;
-            return startTime && endTime;
-          })
-          .map((job) => {
-            const worker = workersMap.get(job.worker_id);
-            const project = projectsMap.get(job.project_id);
-
-            const scheduledStart = new Date(job.schedule_start);
-            const scheduledEnd = new Date(job.schedule_end);
-            const actualStart = job.actual_start ? new Date(job.actual_start) : null;
-            const actualEnd = job.actual_end ? new Date(job.actual_end) : null;
-
-            const logStatus = job.status === 'schedule' ? LogStatus.SCHEDULE :
-              job.status === 'active' ? LogStatus.ACTIVE :
-                job.status === 'approved' ? LogStatus.APPROVED :
-                  job.status === 'rejected' ? LogStatus.REJECTED :
-                    job.status === 'waiting_approval' ? LogStatus.WAITING_APPROVAL :
-                      LogStatus.SCHEDULE;
-
-            return {
-              id: String(job.id),
-              workerName: worker?.name || 'Unknown Worker',
-              role: worker?.position || 'Worker',
-              projectId: String(job.project_id),
-              projectName: project?.name || 'Unknown Project',
-              scheduledStart,
-              scheduledEnd,
-              actualStart,
-              actualEnd,
-              originalActualStart: actualStart,
-              originalActualEnd: actualEnd,
-              status: logStatus,
-              notes: `Job #${job.id}`,
-              adjustmentReason: job.modified_start ? 'Job rescheduled' : undefined,
-              approvedAt: actualEnd || undefined,
-              approvedBy: actualEnd ? 'System' : undefined,
-              // Include flag fields from database
-              is_flag: job.is_flag || false,
-              flag_reason: job.flag_reason || null
-            };
-          });
-
         setLogs(logsData);
+
+        // Fetch dashboard alerts
+        try {
+          const response = await fetch('/api/jobs/dashboard/alerts');
+          if (response.ok) {
+            const alertsData = await response.json();
+            // Convert alerts array to a map keyed by project ID
+            // Handle both string and number IDs for matching
+            const flagMapObj = {};
+            if (alertsData.alerts && Array.isArray(alertsData.alerts)) {
+              alertsData.alerts.forEach(alert => {
+                // Use both string and number keys to handle ID type mismatches
+                const id = alert.id;
+                flagMapObj[id] = alert;
+                flagMapObj[String(id)] = alert;
+                flagMapObj[Number(id)] = alert;
+              });
+            }
+            console.log('📊 Flag map loaded:', Object.keys(flagMapObj).length, 'projects');
+            setFlagMap(flagMapObj);
+          } else {
+            console.error('Failed to fetch dashboard alerts:', response.statusText);
+            setFlagMap({});
+          }
+        } catch (alertError) {
+          console.error('Error fetching dashboard alerts:', alertError);
+          setFlagMap({});
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
         setProjects([]);
         setLogs([]);
+        setFlagMap({});
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
+
   }, []);
 
   // Stats Calculation
@@ -115,13 +77,71 @@ function DashboardPage() {
     { name: 'Planning', value: projects.filter(p => p.status === ProjectStatus.PLANNING).length },
   ];
 
-  const projectAlerts = projects.map(p => ({
-    ...p,
-    alerts: p.id % 2 === 0 ? true : false,
-    lateCase: p.id % 2 === 0 ? p.id + p.id : 0,
-    overTime: p.id % 3 === 0 ? p.id * 2 : 0,
-    overBudget: p.id == 8 ? p.id * 3 : 0,
-  })).filter(p => p.alerts);
+  const projectAlerts = React.useMemo(() => {
+    console.log('🔄 Calculating project alerts with flagged jobs...');
+    console.log(`📊 Processing ${projects.length} projects`);
+    console.log('🔍 Flag map keys:', Object.keys(flagMap));
+    console.log('🔍 Project IDs:', projects.map(p => `${p.id} (${typeof p.id})`));
+
+    // Build project alerts with flags
+    const alerts = projects.map(p => {
+      // Try multiple ID formats to match (string, number, both)
+      const projectId = p.id;
+      const projectFlags = flagMap[projectId] || flagMap[String(projectId)] || flagMap[Number(projectId)] || {
+        totalJobs: 0,
+        flaggedJobs: 0,
+        notStartedOnTime: 0,
+        startedLate: 0,
+        notEndedOnTime: 0,
+        flaggedJobDetails: []
+      };
+
+
+      // A project has alerts if it has flagged jobs
+      const hasAlerts = projectFlags.flaggedJobs > 0;
+
+      if (projectFlags.flaggedJobs > 0) {
+        console.log(`🚨 Project ${p.id} (${p.name}):`, projectFlags);
+      }
+
+      return {
+        ...p,
+        alerts: hasAlerts,
+        // Add flagged job data
+        flaggedJobs: projectFlags.flaggedJobs || 0,
+        totalJobs: projectFlags.totalJobs || 0,
+        flagBreakdown: projectFlags.flagBreakdown || {
+          notStartedOnTime: projectFlags.notStartedOnTime || 0,
+          startedLate: projectFlags.startedLate || 0,
+          notEndedOnTime: projectFlags.notEndedOnTime || 0
+        },
+        flaggedJobDetails: projectFlags.flaggedJobDetails || []
+      };
+    }).filter(p => p.alerts); // Only show projects with alerts
+
+    // Sort by flagged jobs (highest first)
+    const sortedAlerts = alerts.sort((a, b) => {
+      const aFlags = a.flaggedJobs || 0;
+      const bFlags = b.flaggedJobs || 0;
+      return bFlags - aFlags;
+    });
+
+    const totalFlaggedJobs = sortedAlerts.reduce((sum, p) => sum + (p.flaggedJobs || 0), 0);
+    console.log(`✅ Found ${sortedAlerts.length} projects with alerts`);
+    console.log(`🚨 Total flagged jobs: ${totalFlaggedJobs}`);
+    
+    // Log top 3 projects for debugging
+    sortedAlerts.slice(0, 3).forEach((alert, idx) => {
+      console.log(`#${idx + 1}: ${alert.name} - ${alert.flaggedJobs} flagged jobs`, {
+        notStarted: alert.flagBreakdown.notStartedOnTime,
+        startedLate: alert.flagBreakdown.startedLate,
+        notEnded: alert.flagBreakdown.notEndedOnTime
+      });
+    });
+
+    return sortedAlerts;
+  }, [projects, logs, flagMap]);
+
 
   const handleSelectProject = (project) => {
     // Navigation will be handled by the component that calls this

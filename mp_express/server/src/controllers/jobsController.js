@@ -181,3 +181,107 @@ export const deleteJob = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+
+// Dashboard alerts
+
+export const getDashboardAlerts = async (req, res) => {
+  try {
+    // Query uses pre-calculated flags from database
+    const [projectAlerts] = await db.query(`
+     SELECT 
+        p.id,
+        p.name,
+
+        
+        -- Count flagged jobs by type
+        COUNT(CASE WHEN j.is_flag = 1 THEN 1 END) as flaggedJobs,
+        COUNT(CASE WHEN j.flag_reason = 'Not Started On Time' THEN 1 END) as notStartedOnTime,
+        COUNT(CASE WHEN j.flag_reason = 'Started Late' THEN 1 END) as startedLate,
+        COUNT(CASE WHEN j.flag_reason = 'Not Ended On Time' THEN 1 END) as notEndedOnTime,
+        
+        -- Total jobs for this project
+        COUNT(j.id) as totalJobs,
+        
+        -- Other metrics (customize based on your needs)
+        COUNT(CASE WHEN j.actual_end > j.schedule_end THEN 1 END) as lateCase,
+        COUNT(CASE WHEN 
+          j.actual_end IS NOT NULL 
+          AND j.actual_start IS NOT NULL 
+          AND TIMESTAMPDIFF(MINUTE, j.actual_start, j.actual_end) > TIMESTAMPDIFF(MINUTE, j.schedule_start, j.schedule_end)
+        THEN 1 END) as overTime,
+        
+
+        
+        -- Last flag calculation time
+        MAX(j.flag_calculated_at) as lastFlagUpdate
+        
+      FROM projects p
+      LEFT JOIN jobs j ON p.id = j.project_id
+      and j.schedule_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+      GROUP BY p.id, p.name
+      HAVING 
+        flaggedJobs > 0 
+        OR lateCase > 0 
+        OR overTime > 0 
+      ORDER BY 
+        flaggedJobs DESC,
+        lateCase DESC,
+        overTime desc;
+    `);
+
+
+    console.log(`[DASHBOARD] Found ${projectAlerts.length} projects with alerts`);
+    console.log(projectAlerts);
+
+    // Format response
+    const formattedAlerts = projectAlerts.map(alert => ({
+      id: alert.id,
+      name: alert.name,
+      status: alert.status,
+      
+      // Flag data
+      flaggedJobs: parseInt(alert.flaggedJobs) || 0,
+      totalJobs: parseInt(alert.totalJobs) || 0,
+      flagBreakdown: {
+        notStartedOnTime: parseInt(alert.notStartedOnTime) || 0,
+        startedLate: parseInt(alert.startedLate) || 0,
+        notEndedOnTime: parseInt(alert.notEndedOnTime) || 0
+      },
+      
+      // Other metrics
+      lateCase: parseInt(alert.lateCase) || 0,
+      overTime: parseInt(alert.overTime) || 0,
+      overBudget: Boolean(alert.overBudget),
+      
+      // Metadata
+      lastFlagUpdate: alert.lastFlagUpdate
+    }));
+
+    // Calculate summary statistics
+    const summary = {
+      totalProjects: projectAlerts.length,
+      totalFlaggedJobs: formattedAlerts.reduce((sum, p) => sum + p.flaggedJobs, 0),
+      projectsWithFlags: formattedAlerts.filter(p => p.flaggedJobs > 0).length,
+      breakdown: {
+        notStartedOnTime: formattedAlerts.reduce((sum, p) => sum + p.flagBreakdown.notStartedOnTime, 0),
+        startedLate: formattedAlerts.reduce((sum, p) => sum + p.flagBreakdown.startedLate, 0),
+        notEndedOnTime: formattedAlerts.reduce((sum, p) => sum + p.flagBreakdown.notEndedOnTime, 0)
+      }
+    };
+
+    res.json({
+      success: true,
+      alerts: formattedAlerts,
+      summary,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
