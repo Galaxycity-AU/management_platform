@@ -686,6 +686,10 @@ const CentraliseView = () => {
         <div 
           ref={dateStripScrollRef}
           className="flex bg-white border-b border-slate-200 overflow-x-auto no-scrollbar scroll-smooth"
+          style={{ 
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#cbd5e0 #f7fafc'
+          }}
         >
           {dates.map((date, index) => (
             <button
