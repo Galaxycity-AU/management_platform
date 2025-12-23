@@ -190,6 +190,8 @@ const CentraliseView = () => {
     loadData();
   }, [loadData]);
 
+
+
   const generateDates = () => {
     const dates = [];
     const year = currentMonth.getFullYear();

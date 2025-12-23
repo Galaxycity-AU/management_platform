@@ -391,6 +391,17 @@ const LogApprovalCard = ({ log, onApprove, onReject }) => {
 
           {/* 3. Variance Stats */}
           <div className="w-40 flex-shrink-0 text-center">
+             {/* Job Date */}
+             {(log.actualStart || log.scheduleStart) && (
+                <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {(log.actualStart || log.scheduleStart).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </p>
+              )}
             <div className="text-sm font-mono font-medium text-gray-700">
               {formatTime(log.scheduleStart)} - {formatTime(log.scheduleEnd)}
             </div>
@@ -821,7 +832,7 @@ export const ApprovalQueue = ({ logs, onApprove, onReject }) => {
                   {selectedProject.hasIssues && <TriangleAlert className="w-5 h-5 text-amber-500" />}
                 </h1>
                 <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
-                  <Clock className="w-3 h-3" /> {pendingLogs.length} entries awaiting review
+                  <Clock className="w-3 h-3" /> {selectedProjectLogs.length} entries awaiting review
                 </p>
               </div>
 
