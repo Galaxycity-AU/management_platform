@@ -152,7 +152,7 @@ export function calculateJobFlags(job, now = new Date()) {
     log(jobId, '✅ Final Flag: Not Started On Time', { delay_minutes: delayMinutes });
     return { 
       is_flag: true, 
-      flag_reason: 'Not Started On Time',
+      flag_reason: 'Not Started',
       delay_minutes: delayMinutes
     };
   } else if (startedLate) {
@@ -160,7 +160,7 @@ export function calculateJobFlags(job, now = new Date()) {
     log(jobId, '✅ Final Flag: Started Late', { delay_minutes: delayMinutes });
     return { 
       is_flag: true, 
-      flag_reason: 'Started Late',
+      flag_reason: 'Late',
       delay_minutes: delayMinutes
     };
   } else if (notEndedOnTime) {
@@ -168,7 +168,7 @@ export function calculateJobFlags(job, now = new Date()) {
     log(jobId, '✅ Final Flag: Not Ended On Time', { delay_minutes: delayMinutes });
     return { 
       is_flag: true, 
-      flag_reason: 'Not Ended On Time',
+      flag_reason: 'Not Ended',
       delay_minutes: delayMinutes
     };
   }

@@ -656,11 +656,6 @@ export const ProjectDetail = ({ project, projectData, logs, onBack, onAnalyze })
                                     </div>
                                     <div className="h-8 w-px bg-gray-200"></div>
                                     <div>
-                                        <span className="text-2xl font-bold text-green-600">{started}</span>
-                                        <span className="text-xs text-gray-500 ml-1">started</span>
-                                    </div>
-                                    <div className="h-8 w-px bg-gray-200"></div>
-                                    <div>
                                         <span className="text-2xl font-bold text-blue-600">{finished}</span>
                                         <span className="text-xs text-gray-500 ml-1">finished</span>
                                     </div>

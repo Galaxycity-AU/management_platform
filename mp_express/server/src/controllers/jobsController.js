@@ -245,9 +245,9 @@ export const getDashboardAlerts = async (req, res) => {
         
         -- Count flagged jobs by type
         COUNT(CASE WHEN j.is_flag = 1 THEN 1 END) as flaggedJobs,
-        COUNT(CASE WHEN j.flag_reason = 'Not Started On Time' THEN 1 END) as notStartedOnTime,
-        COUNT(CASE WHEN j.flag_reason = 'Started Late' THEN 1 END) as startedLate,
-        COUNT(CASE WHEN j.flag_reason = 'Not Ended On Time' THEN 1 END) as notEndedOnTime,
+        COUNT(CASE WHEN j.flag_reason = 'Not Started' THEN 1 END) as notStartedOnTime,
+        COUNT(CASE WHEN j.flag_reason = 'Late' THEN 1 END) as startedLate,
+        COUNT(CASE WHEN j.flag_reason = 'Not Ended' THEN 1 END) as notEndedOnTime,
         
         -- Total jobs for this project
         COUNT(j.id) as totalJobs,
@@ -280,8 +280,8 @@ export const getDashboardAlerts = async (req, res) => {
     `);
 
 
-    console.log(`[DASHBOARD] Found ${projectAlerts.length} projects with alerts`);
-    console.log(projectAlerts);
+    // console.log(`[DASHBOARD] Found ${projectAlerts.length} projects with alerts`);
+    // console.log(projectAlerts);
 
     // Format response
     const formattedAlerts = projectAlerts.map(alert => ({

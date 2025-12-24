@@ -153,7 +153,7 @@ function DashboardPage() {
     });
 
     const totalFlaggedJobs = sortedAlerts.reduce((sum, p) => sum + (p.flaggedJobs || 0), 0);
-    console.log(`[Dashboard] Found ${sortedAlerts.length} projects with alerts, ${totalFlaggedJobs} total flagged jobs`);
+    // console.log(`[Dashboard] Found ${sortedAlerts.length} projects with alerts, ${totalFlaggedJobs} total flagged jobs`);
 
     return sortedAlerts;
   }, [projects, logs, flagMap]);
