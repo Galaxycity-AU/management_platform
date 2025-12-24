@@ -136,6 +136,30 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
             {/* Workers Rows with Sticky Columns */}
             <div className="space-y-0 relative">
                 {logs.map((log, idx) => {
+                    // Use status from database (set by workflow: schedule -> waiting_approval -> approved/rejected)
+                    const status = log.status || 'schedule';
+                    
+                    // Map status to display text and color
+                    let statusText = 'Error';
+                    let statusColor = 'text-gray-700';
+                    
+                    if (status === LogStatus.ACTIVE || (!log.actualEnd && log.actualStart)) {
+                        statusText = 'Active';
+                        statusColor = 'text-green-600';
+                    } else if (status === LogStatus.WAITING_APPROVAL) {
+                        statusText = 'Pending';
+                        statusColor = 'text-amber-600';
+                    } else if (status === LogStatus.APPROVED) {
+                        statusText = 'Approved';
+                        statusColor = 'text-green-600';
+                    } else if (status === LogStatus.REJECTED) {
+                        statusText = 'Rejected';
+                        statusColor = 'text-red-600';
+                    } else if (status === LogStatus.SCHEDULE) {
+                        statusText = 'Scheduled';
+                        statusColor = 'text-gray-500';
+                    }
+
                     // Check if this is a carry-forward task from a previous day
                     const isCarryForward = log.scheduledStart < minTime;
 
@@ -156,15 +180,11 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
 
                     // Enhanced status colors matching the screenshot
                     let barColor = 'bg-blue-300';
-                    let statusText = 'Error';
-                    let statusColor = 'text-gray-700';
                     let timeText = '';
 
                     console.log('Log Status Check:', log.workerName, log.status, { isLive, actualStart, actualEnd, isCarryForward });
                     if (isLive) {
                         barColor = 'bg-green-300';
-                        statusText = 'Active';
-                        statusColor = 'text-green-600';
                         // For carry-forward tasks, show both scheduled and actual times
                         if (isCarryForward) {
                             const startDate = actualStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -181,19 +201,8 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                     } else if (log.status === LogStatus.WAITING_APPROVAL || log.status === LogStatus.APPROVED || log.status === LogStatus.REJECTED) {
                         barColor = 'bg-blue-300';
                         timeText = `${formatTime(actualStart)} - ${formatTime(actualEnd)} (${calculateDuration(actualStart, actualEnd)})`;
-                        if (log.status === LogStatus.WAITING_APPROVAL) {
-                            statusText = 'Waiting Approval';
-                            statusColor = 'text-amber-600';
-                        } else if (log.status === LogStatus.APPROVED) {
-                            statusText = 'Approved';
-                            statusColor = 'text-green-600';
-                        } else if (log.status === LogStatus.REJECTED) {
-                            statusText = 'Rejected';
-                            statusColor = 'text-red-600';
-                        }
                     } else if (log.status === LogStatus.SCHEDULE) {
-                        statusText = 'Scheduled';
-                        statusColor = 'text-gray-500';
+                        // statusText and statusColor already set from database 
                     }
 
                     // Generate initials for avatar
@@ -209,6 +218,7 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                                      isFlagged && 
                                      log.flag_reason !== null;
 
+                    console.log('Log Status Check:', log.workerName, log.status, { isLive, actualStart, actualEnd, isCarryForward });
                     console.log('Log Alert Check:', log.workerName, {
                         jobId: log.id,
                         is_flag: log.is_flag,
@@ -295,8 +305,8 @@ const WorkerGanttChart = ({ logs, currentDate }) => {
                                 <div className={`text-sm font-semibold ${statusColor} mb-0.5`}>
                                     {showAlert ? (
                                         <span className="flex items-center justify-end gap-1" title={log.flag_reason || ''}>
-                                            <TriangleAlert className="w-4 h-4 inline-block align-middle" style={{ color: 'red' }} />
-                                            <span className="text-[10px] text-red-600 font-medium">{log.flag_reason}</span>
+                                            <TriangleAlert className="w-8 h-8 inline-block align-middle" style={{ color: 'red' }} />
+                                            <span className="text-sm text-red-600 font-medium">{log.flag_reason}</span>
                                         </span>
                                     ) : null}
                                     {!showAlert && statusText}
